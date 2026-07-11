@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../utils/currency.dart';
+import '../utils/dates.dart';
 import '../models/allocation.dart';
 import '../models/business_settings.dart';
 import '../models/sale.dart';
@@ -9,11 +10,11 @@ import '../models/shop_drop.dart';
 import '../models/product.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../widgets/bill_modal.dart';
 import '../widgets/bill_receipt_card.dart';
 import '../widgets/confirm_dialog.dart';
 import 'account_settings_screen.dart';
 import 'add_shop_screen.dart';
-import 'bill_screen.dart';
 
 class DeliveryHomeScreen extends StatefulWidget {
   const DeliveryHomeScreen({
@@ -45,15 +46,11 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
   String? _error;
 
   String _sevenDaysAgoDate() {
-    final date = DateTime.now();
-    final start = DateTime(date.year, date.month, date.day)
-        .subtract(const Duration(days: 6));
-    return start.toIso8601String().substring(0, 10);
+    final start = DateTime.now().toLocal().subtract(const Duration(days: 6));
+    return localDateString(start);
   }
 
-  String _todayDate() {
-    return DateTime.now().toIso8601String().substring(0, 10);
-  }
+  String _todayDate() => localDateString();
 
   @override
   void initState() {
@@ -71,7 +68,9 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
         dateTo: _todayDate(),
       );
       final shops = await widget.apiService.fetchShops();
-      final allocations = await widget.apiService.fetchMyAllocations();
+      final allocations = await widget.apiService.fetchMyAllocations(
+        date: _todayDate(),
+      );
       if (!mounted) return;
       setState(() {
         _businessSettings = settings;
@@ -88,17 +87,28 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
   }
 
   Future<void> _openCreateDelivery() async {
-    await Navigator.of(context).push(
+    await _load();
+    if (!mounted) return;
+    final sale = await Navigator.of(context).push<Sale>(
       MaterialPageRoute(
         builder: (_) => CreateDeliveryScreen(
           apiService: widget.apiService,
           user: widget.user,
           shops: _shops,
-          allocations: _allocations.where((a) => a.remaining > 0).toList(),
           businessSettings: _businessSettings,
         ),
       ),
     );
+    if (!mounted) return;
+    if (sale != null) {
+      await showBillModal(
+        context,
+        apiService: widget.apiService,
+        saleId: sale.id,
+        businessSettings: _businessSettings,
+      );
+    }
+    if (!mounted) return;
     await _load();
   }
 
@@ -300,15 +310,11 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                                           ],
                                         ),
                                         onTap: () async {
-                                          await Navigator.of(context).push(
-                                            MaterialPageRoute(
-                                              builder: (_) => BillScreen(
-                                                apiService: widget.apiService,
-                                                saleId: sale.id,
-                                                businessSettings:
-                                                    _businessSettings,
-                                              ),
-                                            ),
+                                          await showBillModal(
+                                            context,
+                                            apiService: widget.apiService,
+                                            saleId: sale.id,
+                                            businessSettings: _businessSettings,
                                           );
                                           await _load();
                                         },
@@ -331,14 +337,12 @@ class CreateDeliveryScreen extends StatefulWidget {
     required this.apiService,
     required this.user,
     required this.shops,
-    required this.allocations,
     required this.businessSettings,
   });
 
   final ApiService apiService;
   final AppUser user;
   final List<Shop> shops;
-  final List<AllocationSummary> allocations;
   final BusinessSettings businessSettings;
 
   @override
@@ -351,15 +355,41 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
   final Map<int, int> _quantities = {};
   final _notesController = TextEditingController();
   List<Product> _products = [];
+  List<AllocationSummary> _allocations = [];
   String? _error;
   bool _saving = false;
   bool _loadingProducts = true;
+  bool _loadingAllocations = true;
+
+  List<AllocationSummary> get _availableAllocations =>
+      _allocations.where((item) => item.remaining > 0).toList();
 
   @override
   void initState() {
     super.initState();
     _shops = List<Shop>.from(widget.shops);
     _loadProducts();
+    _loadAllocations();
+  }
+
+  Future<void> _loadAllocations() async {
+    setState(() => _loadingAllocations = true);
+    try {
+      final allocations = await widget.apiService.fetchMyAllocations(
+        date: localDateString(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _allocations = allocations;
+        _loadingAllocations = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString().replaceFirst('Exception: ', '');
+        _loadingAllocations = false;
+      });
+    }
   }
 
   Future<void> _loadProducts() async {
@@ -386,7 +416,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
       if (entry.value <= 0) continue;
       final product = _productMap[entry.key];
       AllocationSummary? allocation;
-      for (final item in widget.allocations) {
+      for (final item in _allocations) {
         if (item.productId == entry.key) {
           allocation = item;
           break;
@@ -453,21 +483,13 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
       final sale = await widget.apiService.createSale(
         SaleInput(
           shopId: _selectedShop!.id,
-          saleDate: DateTime.now().toIso8601String(),
+          saleDate: localDateString(),
           notes: _notesController.text.trim(),
           items: items,
         ),
       );
       if (!mounted) return;
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => BillScreen(
-            apiService: widget.apiService,
-            saleId: sale.id,
-            businessSettings: widget.businessSettings,
-          ),
-        ),
-      );
+      Navigator.of(context).pop(sale);
     } catch (error) {
       setState(() => _error = error.toString());
     } finally {
@@ -483,6 +505,12 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
         title: const Text('Record delivery'),
         backgroundColor: const Color(0xFFB45309),
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            onPressed: _loadingAllocations ? null : _loadAllocations,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -522,9 +550,18 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
           const SizedBox(height: 16),
           Text('Products to deliver', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          if (widget.allocations.isEmpty)
-            const Text('No stock assigned to you today. Ask admin to assign stock.'),
-          ...widget.allocations.map((allocation) {
+          const SizedBox(height: 8),
+          if (_loadingAllocations)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_availableAllocations.isEmpty)
+            const Text(
+              'No stock assigned to you today. Ask admin to assign stock, or tap refresh after a new assignment.',
+            )
+          else
+            ..._availableAllocations.map((allocation) {
             final qty = _quantities[allocation.productId] ?? 0;
             return ListTile(
               title: Text(allocation.productName),
@@ -615,7 +652,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
               minimumSize: const Size.fromHeight(52),
             ),
             child: Text(
-              _saving ? 'Saving...' : 'Save delivery & open bill',
+              _saving ? 'Saving...' : 'Save delivery',
             ),
           ),
         ],

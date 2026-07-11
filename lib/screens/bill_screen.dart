@@ -12,11 +12,13 @@ class BillScreen extends StatefulWidget {
     required this.apiService,
     required this.saleId,
     required this.businessSettings,
+    this.embedded = false,
   });
 
   final ApiService apiService;
   final int saleId;
   final BusinessSettings businessSettings;
+  final bool embedded;
 
   @override
   State<BillScreen> createState() => _BillScreenState();
@@ -137,6 +139,15 @@ class _BillScreenState extends State<BillScreen> {
         title: const Text('Delivery bill'),
         backgroundColor: const Color(0xFFB45309),
         foregroundColor: Colors.white,
+        automaticallyImplyLeading: !widget.embedded,
+        actions: widget.embedded
+            ? [
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  icon: const Icon(Icons.close),
+                ),
+              ]
+            : null,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

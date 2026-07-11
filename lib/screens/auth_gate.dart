@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/business_settings.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
-import 'admin_home_screen.dart';
+import 'admin_shell.dart';
 import 'delivery_home_screen.dart';
 import 'login_screen.dart';
 
@@ -95,7 +95,7 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     if (_user!.isAdmin) {
-      return AdminHomeScreen(
+      return AdminShell(
         apiService: widget.apiService,
         user: _user!,
         businessSettings: _businessSettings,

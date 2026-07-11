@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
+import '../models/admin_models.dart';
 import '../models/allocation.dart';
 import '../models/business_settings.dart';
 import '../models/product.dart';
@@ -139,11 +140,12 @@ class ApiService {
   }
 
   Future<List<AllocationSummary>> fetchMyAllocations({String? date}) async {
-    final params = <String, String>{};
-    if (date != null) params['date'] = date;
+    final params = <String, String>{
+      'date': date ?? _localDateString(),
+    };
 
     final uri = Uri.parse('$_baseUrl/api/allocations').replace(
-      queryParameters: params.isEmpty ? null : params,
+      queryParameters: params,
     );
     final response = await _client.get(uri, headers: _headers());
     final data = await _decode(response);
@@ -254,5 +256,77 @@ class ApiService {
     );
     final data = await _decode(response);
     return Sale.fromJson(data['sale'] as Map<String, dynamic>);
+  }
+
+  Future<DashboardStats> fetchDashboard() async {
+    final response = await _client.get(
+      Uri.parse('$_baseUrl/api/dashboard'),
+      headers: _headers(),
+    );
+    final data = await _decode(response);
+    return DashboardStats.fromJson(data['stats'] as Map<String, dynamic>);
+  }
+
+  Future<List<DeliveryPartner>> fetchDeliveryPartners() async {
+    final response = await _client.get(
+      Uri.parse('$_baseUrl/api/delivery-guys'),
+      headers: _headers(),
+    );
+    final data = await _decode(response);
+    return (data['deliveryGuys'] as List)
+        .map((item) => DeliveryPartner.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<({
+    List<AllocationSummary> summary,
+    List<AllocationRecord> records,
+  })> fetchAdminAllocations({
+    String? date,
+    int? deliveryGuyId,
+  }) async {
+    final params = <String, String>{
+      'date': date ?? _localDateString(),
+    };
+    if (deliveryGuyId != null) {
+      params['deliveryGuyId'] = deliveryGuyId.toString();
+    }
+
+    final uri = Uri.parse('$_baseUrl/api/allocations').replace(
+      queryParameters: params,
+    );
+    final response = await _client.get(uri, headers: _headers());
+    final data = await _decode(response);
+    final summary = (data['summary'] as List)
+        .map((item) => AllocationSummary.fromJson(item as Map<String, dynamic>))
+        .toList();
+    final records = (data['allocations'] as List? ?? [])
+        .map((item) => AllocationRecord.fromJson(item as Map<String, dynamic>))
+        .toList();
+    return (summary: summary, records: records);
+  }
+
+  Future<void> createStockAssignment({
+    required int deliveryGuyId,
+    required String allocationDate,
+    required List<Map<String, int>> items,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$_baseUrl/api/allocations'),
+      headers: _headers(),
+      body: jsonEncode({
+        'deliveryGuyId': deliveryGuyId,
+        'allocationDate': allocationDate,
+        'items': items,
+      }),
+    );
+    await _decode(response);
+  }
+
+  String _localDateString() {
+    final now = DateTime.now().toLocal();
+    final month = now.month.toString().padLeft(2, '0');
+    final day = now.day.toString().padLeft(2, '0');
+    return '${now.year}-$month-$day';
   }
 }
