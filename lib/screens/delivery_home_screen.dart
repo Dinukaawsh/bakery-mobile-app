@@ -14,6 +14,8 @@ import '../models/user.dart';
 import '../services/api_service.dart';
 import '../widgets/bill_modal.dart';
 import '../widgets/bill_receipt_card.dart';
+import '../widgets/bakery_app_bar.dart';
+import '../widgets/bakery_loading_spinner.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/locale_toggle.dart';
 import 'account_settings_screen.dart';
@@ -567,10 +569,9 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFFBEB),
-      appBar: AppBar(
-        title: Text(t('delivery.recordDelivery')),
-        backgroundColor: const Color(0xFFB45309),
-        foregroundColor: Colors.white,
+      appBar: bakeryAppBar(
+        context,
+        title: t('delivery.recordDelivery'),
         actions: [
           const LocaleToggle(),
           IconButton(
@@ -669,7 +670,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
           if (_loadingAllocations)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
-              child: Center(child: CircularProgressIndicator()),
+              child: BakeryLoadingCenter(),
             )
           else if (_availableAllocations.isEmpty)
             Text(t('delivery.noStockAssignedHint'))
@@ -749,7 +750,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
           if (_loadingProducts)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator()),
+              child: BakeryLoadingCenter(),
             )
           else
             BillReceiptCard(

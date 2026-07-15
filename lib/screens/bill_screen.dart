@@ -7,6 +7,8 @@ import '../services/api_service.dart';
 import '../utils/bill_print.dart';
 import '../utils/currency.dart';
 import '../utils/safe_insets.dart';
+import '../widgets/bakery_app_bar.dart';
+import '../widgets/bakery_loading_spinner.dart';
 import '../widgets/bill_receipt_card.dart';
 
 class BillScreen extends StatefulWidget {
@@ -198,11 +200,10 @@ class _BillScreenState extends State<BillScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFFBEB),
-      appBar: AppBar(
-        title: Text(t('bill.title')),
-        backgroundColor: const Color(0xFFB45309),
-        foregroundColor: Colors.white,
-        automaticallyImplyLeading: !widget.embedded,
+      appBar: bakeryAppBar(
+        context,
+        title: t('bill.title'),
+        onBack: () => Navigator.of(context).pop(widget.embedded ? true : null),
         actions: widget.embedded
             ? [
                 IconButton(
@@ -214,7 +215,7 @@ class _BillScreenState extends State<BillScreen> {
             : null,
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const BakeryLoadingCenter()
           : _error != null
               ? Center(
                   child: Padding(
@@ -281,13 +282,10 @@ class _BillScreenState extends State<BillScreen> {
                     FilledButton.icon(
                       onPressed: _printing ? null : _printBill,
                       icon: _printing
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
+                          ? const BakeryLoadingSpinner(
+                              size: BakerySpinnerSize.sm,
+                              color: Colors.white,
+                              trackColor: Color(0x33FFFFFF),
                             )
                           : const Icon(Icons.print_rounded),
                       label: Text(

@@ -4,6 +4,7 @@ import '../l10n/locale_scope.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../utils/safe_insets.dart';
+import '../widgets/bakery_app_bar.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
   const AccountSettingsScreen({
@@ -115,7 +116,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     final t = LocaleScope.of(context).t;
 
     return Scaffold(
-      appBar: AppBar(title: Text(t('account.title'))),
+      backgroundColor: const Color(0xFFFFFBEB),
+      appBar: bakeryAppBar(context, title: t('account.title')),
       body: ListView(
         padding: listPaddingWithSystemBottom(context, bottomBase: 24),
         children: [

@@ -13,6 +13,7 @@ import '../models/user.dart';
 import '../services/api_service.dart';
 import '../utils/currency.dart';
 import '../utils/dates.dart';
+import '../widgets/bakery_loading_spinner.dart';
 import '../widgets/bill_modal.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/locale_toggle.dart';
@@ -453,7 +454,7 @@ class _AdminDashboardPageState extends State<_AdminDashboardPage> {
       );
     }
     if (_stats == null) {
-      return const Center(child: CircularProgressIndicator());
+      return const BakeryLoadingCenter();
     }
 
     final stats = _stats!;
@@ -1585,7 +1586,7 @@ class _AdminAssignmentHistoryPageState
           ),
         Expanded(
           child: _loading && _records.isEmpty
-              ? const Center(child: CircularProgressIndicator())
+              ? const BakeryLoadingCenter()
               : RefreshIndicator(
                   onRefresh: _load,
                   child: _records.isEmpty
@@ -2135,7 +2136,7 @@ class _AdminCalendarPageState extends State<_AdminCalendarPage> {
         if (_loading)
           const Padding(
             padding: EdgeInsets.all(24),
-            child: Center(child: CircularProgressIndicator()),
+            child: BakeryLoadingCenter(),
           ),
         Expanded(
           child: _listMode

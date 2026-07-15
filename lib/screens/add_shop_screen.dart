@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/locale_scope.dart';
 import '../services/api_service.dart';
 import '../utils/safe_insets.dart';
+import '../widgets/bakery_app_bar.dart';
 
 class AddShopScreen extends StatefulWidget {
   const AddShopScreen({super.key, required this.apiService});
@@ -70,11 +71,8 @@ class _AddShopScreenState extends State<AddShopScreen> {
     final t = LocaleScope.of(context).t;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(t('addShop.title')),
-        backgroundColor: Colors.amber.shade800,
-        foregroundColor: Colors.white,
-      ),
+      backgroundColor: const Color(0xFFFFFBEB),
+      appBar: bakeryAppBar(context, title: t('addShop.title')),
       body: ListView(
         padding: listPaddingWithSystemBottom(context, bottomBase: 24),
         children: [

@@ -4,6 +4,7 @@ import '../l10n/locale_scope.dart';
 import '../models/business_settings.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../widgets/bakery_loading_spinner.dart';
 import '../widgets/locale_toggle.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -358,13 +359,10 @@ class _LoginCard extends StatelessWidget {
                 ),
               ),
               child: loading
-                  ? const SizedBox(
-                      height: 22,
-                      width: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
-                      ),
+                  ? const BakeryLoadingSpinner(
+                      size: BakerySpinnerSize.sm,
+                      color: Colors.white,
+                      trackColor: Color(0x33FFFFFF),
                     )
                   : Text(
                       t('login.signIn'),

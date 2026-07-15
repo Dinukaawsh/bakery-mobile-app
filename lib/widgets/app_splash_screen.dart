@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'bakery_loading_spinner.dart';
+
 class AppSplashScreen extends StatelessWidget {
   const AppSplashScreen({
     super.key,
@@ -32,13 +34,25 @@ class AppSplashScreen extends StatelessWidget {
           child: Column(
             children: [
               const Spacer(),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: Image.asset(
-                  'assets/icon/app_icon.png',
-                  width: 112,
-                  height: 112,
-                  fit: BoxFit.cover,
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF78350F).withValues(alpha: 0.12),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  child: Image.asset(
+                    'assets/icon/app_icon.png',
+                    width: 96,
+                    height: 96,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -50,29 +64,18 @@ class AppSplashScreen extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
+                    letterSpacing: -0.3,
                     color: Color(0xFF1C1917),
                   ),
                 ),
               ),
-              const SizedBox(height: 28),
-              const SizedBox(
-                width: 36,
-                height: 36,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  color: Color(0xFFB45309),
-                ),
+              const SizedBox(height: 32),
+              BakeryLoadingSpinner(
+                size: BakerySpinnerSize.lg,
+                color: const Color(0xFFB45309),
+                trackColor: const Color(0xFFFDE68A),
+                label: message,
               ),
-              if (message != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  message!,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF57534E),
-                  ),
-                ),
-              ],
               const Spacer(),
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),

@@ -6,6 +6,7 @@ const Map<String, String> stringsSi = {
   'common.cancel': 'අවලංගු කරන්න',
   'common.confirm': 'තහවුරු කරන්න',
   'common.close': 'වසන්න',
+  'common.back': 'ආපසු',
   'common.save': 'සුරකින්න',
   'common.saving': 'සුරකිමින්...',
   'common.loading': 'පූරණය වෙමින්...',

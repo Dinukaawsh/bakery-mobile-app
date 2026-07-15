@@ -6,6 +6,7 @@ const Map<String, String> stringsEn = {
   'common.cancel': 'Cancel',
   'common.confirm': 'Confirm',
   'common.close': 'Close',
+  'common.back': 'Back',
   'common.save': 'Save',
   'common.saving': 'Saving...',
   'common.loading': 'Loading...',
