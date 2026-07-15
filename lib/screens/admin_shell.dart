@@ -69,8 +69,8 @@ class _AdminShellState extends State<AdminShell> {
     final t = LocaleScope.of(context).t;
     final shouldLogout = await showConfirmDialog(
       context,
-      title: t('admin.logoutConfirmTitle'),
-      message: t('admin.logoutConfirmMessage'),
+      title: t('logout.confirmTitle'),
+      message: t('logout.confirmMessage'),
       confirmLabel: t('common.logout'),
       cancelLabel: t('common.cancel'),
       isDanger: true,

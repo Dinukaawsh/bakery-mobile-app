@@ -28,6 +28,11 @@ const Map<String, String> stringsEn = {
   'common.qty': 'Qty',
   'common.optional': 'Optional',
 
+  'splash.loading': 'Loading...',
+
+  'logout.confirmTitle': 'Logout',
+  'logout.confirmMessage': 'Are you sure you want to logout?',
+
   'login.welcome': 'Welcome',
   'login.subtitle': 'Sign in to record deliveries and print shop bills.',
   'login.email': 'Email',

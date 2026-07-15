@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/locale_scope.dart';
 import '../models/business_settings.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../widgets/app_splash_screen.dart';
 import 'admin_shell.dart';
 import 'delivery_home_screen.dart';
 import 'login_screen.dart';
@@ -19,12 +21,26 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   AppUser? _user;
   BusinessSettings _businessSettings = BusinessSettings.fallback;
-  bool _loading = true;
+  bool _bootstrapping = true;
+  bool _splashDone = false;
 
   @override
   void initState() {
     super.initState();
-    _bootstrap();
+    _start();
+  }
+
+  Future<void> _start() async {
+    final splashFuture = Future<void>.delayed(const Duration(milliseconds: 2000));
+    await Future.wait([
+      splashFuture,
+      _bootstrap(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _splashDone = true;
+      _bootstrapping = false;
+    });
   }
 
   Future<void> _bootstrap() async {
@@ -32,24 +48,20 @@ class _AuthGateState extends State<AuthGate> {
 
     try {
       final settings = await widget.apiService.fetchBusinessSettings();
-      _businessSettings = settings;
+      if (!mounted) return;
+      setState(() => _businessSettings = settings);
     } catch (_) {
-      _businessSettings = BusinessSettings.fallback;
+      if (!mounted) return;
+      setState(() => _businessSettings = BusinessSettings.fallback);
     }
 
     try {
       final user = await widget.apiService.getMe();
       if (!mounted) return;
-      setState(() {
-        _user = user;
-        _loading = false;
-      });
+      setState(() => _user = user);
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _user = null;
-        _loading = false;
-      });
+      setState(() => _user = null);
     }
   }
 
@@ -80,9 +92,18 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+    if (!_splashDone || _bootstrapping) {
+      final message = (() {
+        try {
+          return LocaleScope.of(context).t('splash.loading');
+        } catch (_) {
+          return 'Loading...';
+        }
+      })();
+
+      return AppSplashScreen(
+        businessName: _businessSettings.businessName,
+        message: message,
       );
     }
 

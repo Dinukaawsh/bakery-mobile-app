@@ -28,6 +28,11 @@ const Map<String, String> stringsSi = {
   'common.qty': 'ප්‍රමාණය',
   'common.optional': 'විකල්ප',
 
+  'splash.loading': 'පූරණය වෙමින්...',
+
+  'logout.confirmTitle': 'ඉවත් වන්න',
+  'logout.confirmMessage': 'ඔබට ඉවත් වීමට අවශ්‍යද?',
+
   'login.welcome': 'සාදරයෙන් පිළිගනිමු',
   'login.subtitle': 'බෙදාහැරීම් වාර්තා කර සාප්පු බිල්පත් මුද්‍රණය කිරීමට පුරන්න.',
   'login.email': 'විද්‍යුත් තැපෑල',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/locale_scope.dart';
 import '../utils/currency.dart';
 import '../models/business_settings.dart';
 import '../models/product.dart';
@@ -69,12 +70,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Future<void> _confirmLogout() async {
+    final t = LocaleScope.of(context).t;
     final shouldLogout = await showConfirmDialog(
       context,
-      title: 'Sign out?',
-      message: 'You will need to sign in again to use the admin mobile view.',
-      confirmLabel: 'Sign out',
-      cancelLabel: 'Stay signed in',
+      title: t('logout.confirmTitle'),
+      message: t('logout.confirmMessage'),
+      confirmLabel: t('common.logout'),
+      cancelLabel: t('common.cancel'),
       isDanger: true,
     );
     if (shouldLogout) widget.onLogout();

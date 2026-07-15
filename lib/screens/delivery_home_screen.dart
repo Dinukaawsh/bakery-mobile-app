@@ -118,8 +118,8 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
     final t = LocaleScope.of(context).t;
     final shouldLogout = await showConfirmDialog(
       context,
-      title: t('delivery.logoutConfirmTitle'),
-      message: t('delivery.logoutConfirmMessage'),
+      title: t('logout.confirmTitle'),
+      message: t('logout.confirmMessage'),
       confirmLabel: t('common.logout'),
       cancelLabel: t('common.cancel'),
       isDanger: true,
