@@ -352,6 +352,7 @@ class CreateDeliveryScreen extends StatefulWidget {
 class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
   late List<Shop> _shops;
   Shop? _selectedShop;
+  String? _routeFilter;
   final Map<int, int> _quantities = {};
   final _notesController = TextEditingController();
   List<Product> _products = [];
@@ -363,6 +364,22 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
 
   List<AllocationSummary> get _availableAllocations =>
       _allocations.where((item) => item.remaining > 0).toList();
+
+  List<String> get _routeOptions {
+    final routes = _shops
+        .map((shop) => shop.route?.trim())
+        .whereType<String>()
+        .where((route) => route.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    return routes;
+  }
+
+  List<Shop> get _filteredShops {
+    if (_routeFilter == null || _routeFilter!.isEmpty) return _shops;
+    return _shops.where((shop) => (shop.route ?? '') == _routeFilter).toList();
+  }
 
   @override
   void initState() {
@@ -515,6 +532,37 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (_routeOptions.isNotEmpty) ...[
+            DropdownButtonFormField<String?>(
+              value: _routeFilter,
+              decoration: const InputDecoration(
+                labelText: 'Filter by route',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('All routes'),
+                ),
+                ..._routeOptions.map(
+                  (route) => DropdownMenuItem<String?>(
+                    value: route,
+                    child: Text(route),
+                  ),
+                ),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _routeFilter = value;
+                  if (_selectedShop != null &&
+                      !_filteredShops.contains(_selectedShop)) {
+                    _selectedShop = null;
+                  }
+                });
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
           Row(
             children: [
               Expanded(
@@ -524,11 +572,15 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                     labelText: 'Shop',
                     border: OutlineInputBorder(),
                   ),
-                  items: _shops
+                  items: _filteredShops
                       .map(
                         (shop) => DropdownMenuItem(
                           value: shop,
-                          child: Text(shop.name),
+                          child: Text(
+                            shop.route == null || shop.route!.isEmpty
+                                ? shop.name
+                                : '${shop.name} (${shop.route})',
+                          ),
                         ),
                       )
                       .toList(),

@@ -342,6 +342,9 @@ class _AdminProductsPage extends StatefulWidget {
 class _AdminProductsPageState extends State<_AdminProductsPage> {
   List<Product> _products = [];
   String? _error;
+  bool _showActive = true;
+  String? _categoryFilter;
+  String _sortBy = 'name';
 
   @override
   void initState() {
@@ -363,35 +366,164 @@ class _AdminProductsPageState extends State<_AdminProductsPage> {
     }
   }
 
+  List<String> get _categories {
+    final values = _products.map((p) => p.category).toSet().toList()..sort();
+    return values;
+  }
+
+  List<Product> get _visibleProducts {
+    final filtered = _products
+        .where((product) => product.isActive == _showActive)
+        .where(
+          (product) =>
+              _categoryFilter == null || product.category == _categoryFilter,
+        )
+        .toList();
+
+    filtered.sort((a, b) {
+      switch (_sortBy) {
+        case 'priceAsc':
+          return (double.tryParse(a.price) ?? 0)
+              .compareTo(double.tryParse(b.price) ?? 0);
+        case 'priceDesc':
+          return (double.tryParse(b.price) ?? 0)
+              .compareTo(double.tryParse(a.price) ?? 0);
+        case 'stock':
+          return b.stockAvailable.compareTo(a.stockAvailable);
+        default:
+          return a.name.compareTo(b.name);
+      }
+    });
+    return filtered;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_error != null) {
       return Center(child: Text(_error!, style: const TextStyle(color: Colors.red)));
     }
 
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: _products.isEmpty
-          ? ListView(
-              children: const [
-                SizedBox(height: 120),
-                Center(child: Text('No products yet')),
-              ],
-            )
-          : ListView.builder(
-              itemCount: _products.length,
-              itemBuilder: (context, index) {
-                final product = _products[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  child: ListTile(
-                    title: Text(product.name),
-                    subtitle: Text('Stock: ${product.stockAvailable}'),
-                    trailing: Text(formatCurrencyFromString(product.price)),
+    final activeCount = _products.where((p) => p.isActive).length;
+    final inactiveCount = _products.length - activeCount;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Column(
+            children: [
+              SegmentedButton<bool>(
+                segments: [
+                  ButtonSegment(
+                    value: true,
+                    label: Text('Active ($activeCount)'),
                   ),
-                );
-              },
-            ),
+                  ButtonSegment(
+                    value: false,
+                    label: Text('Inactive ($inactiveCount)'),
+                  ),
+                ],
+                selected: {_showActive},
+                onSelectionChanged: (value) {
+                  setState(() => _showActive = value.first);
+                },
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String?>(
+                      value: _categoryFilter,
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('All'),
+                        ),
+                        ..._categories.map(
+                          (category) => DropdownMenuItem<String?>(
+                            value: category,
+                            child: Text(category),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _categoryFilter = value),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _sortBy,
+                      decoration: const InputDecoration(
+                        labelText: 'Sort',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'name', child: Text('Name')),
+                        DropdownMenuItem(
+                          value: 'priceAsc',
+                          child: Text('Price ↑'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'priceDesc',
+                          child: Text('Price ↓'),
+                        ),
+                        DropdownMenuItem(value: 'stock', child: Text('Stock')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) setState(() => _sortBy = value);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: _visibleProducts.isEmpty
+                ? ListView(
+                    children: [
+                      const SizedBox(height: 120),
+                      Center(
+                        child: Text(
+                          _showActive
+                              ? 'No active products'
+                              : 'No inactive products',
+                        ),
+                      ),
+                    ],
+                  )
+                : ListView.builder(
+                    itemCount: _visibleProducts.length,
+                    itemBuilder: (context, index) {
+                      final product = _visibleProducts[index];
+                      return Card(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        child: ListTile(
+                          title: Text(product.name),
+                          subtitle: Text(
+                            '${product.category} • Stock: ${product.stockAvailable}',
+                          ),
+                          trailing: Text(formatCurrencyFromString(product.price)),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -972,6 +1104,8 @@ class _AdminShopsPage extends StatefulWidget {
 class _AdminShopsPageState extends State<_AdminShopsPage> {
   List<Shop> _shops = [];
   String? _error;
+  bool _showActive = true;
+  String? _routeFilter;
 
   @override
   void initState() {
@@ -993,42 +1127,127 @@ class _AdminShopsPageState extends State<_AdminShopsPage> {
     }
   }
 
+  List<String> get _routes {
+    final values = _shops
+        .map((shop) => shop.route?.trim())
+        .whereType<String>()
+        .where((route) => route.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    return values;
+  }
+
+  List<Shop> get _visibleShops {
+    return _shops
+        .where((shop) => shop.isActive == _showActive)
+        .where(
+          (shop) => _routeFilter == null || (shop.route ?? '') == _routeFilter,
+        )
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_error != null) {
       return Center(child: Text(_error!, style: const TextStyle(color: Colors.red)));
     }
 
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: _shops.isEmpty
-          ? ListView(
-              children: const [
-                SizedBox(height: 120),
-                Center(child: Text('No shops yet')),
-              ],
-            )
-          : ListView.builder(
-              itemCount: _shops.length,
-              itemBuilder: (context, index) {
-                final shop = _shops[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  child: ListTile(
-                    title: Text(shop.name),
-                    subtitle: Text(
-                      [
-                        if (shop.ownerName.isNotEmpty) shop.ownerName,
-                        if (shop.address.isNotEmpty) shop.address,
-                        if (shop.phone != null && shop.phone!.isNotEmpty)
-                          shop.phone!,
-                      ].join(' • '),
-                    ),
-                    isThreeLine: true,
+    final activeCount = _shops.where((s) => s.isActive).length;
+    final inactiveCount = _shops.length - activeCount;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Column(
+            children: [
+              SegmentedButton<bool>(
+                segments: [
+                  ButtonSegment(
+                    value: true,
+                    label: Text('Active ($activeCount)'),
                   ),
-                );
-              },
-            ),
+                  ButtonSegment(
+                    value: false,
+                    label: Text('Inactive ($inactiveCount)'),
+                  ),
+                ],
+                selected: {_showActive},
+                onSelectionChanged: (value) {
+                  setState(() => _showActive = value.first);
+                },
+              ),
+              if (_routes.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String?>(
+                  value: _routeFilter,
+                  decoration: const InputDecoration(
+                    labelText: 'Filter by route',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('All routes'),
+                    ),
+                    ..._routes.map(
+                      (route) => DropdownMenuItem<String?>(
+                        value: route,
+                        child: Text(route),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) => setState(() => _routeFilter = value),
+                ),
+              ],
+            ],
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: _visibleShops.isEmpty
+                ? ListView(
+                    children: [
+                      const SizedBox(height: 120),
+                      Center(
+                        child: Text(
+                          _showActive ? 'No active shops' : 'No inactive shops',
+                        ),
+                      ),
+                    ],
+                  )
+                : ListView.builder(
+                    itemCount: _visibleShops.length,
+                    itemBuilder: (context, index) {
+                      final shop = _visibleShops[index];
+                      return Card(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        child: ListTile(
+                          title: Text(shop.name),
+                          subtitle: Text(
+                            [
+                              if (shop.route != null && shop.route!.isNotEmpty)
+                                'Route: ${shop.route}',
+                              if (shop.ownerName.isNotEmpty) shop.ownerName,
+                              if (shop.address.isNotEmpty) shop.address,
+                              if (shop.phone != null && shop.phone!.isNotEmpty)
+                                shop.phone!,
+                            ].join(' • '),
+                          ),
+                          isThreeLine: true,
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
     );
   }
 }

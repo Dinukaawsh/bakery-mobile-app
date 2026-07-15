@@ -181,6 +181,7 @@ class ApiService {
     required String ownerName,
     required String address,
     String? phone,
+    String? route,
   }) async {
     final response = await _client.post(
       Uri.parse('$_baseUrl/api/shops'),
@@ -190,6 +191,7 @@ class ApiService {
         'ownerName': ownerName,
         'address': address,
         if (phone != null && phone.isNotEmpty) 'phone': phone,
+        if (route != null && route.isNotEmpty) 'route': route,
       }),
     );
     final data = await _decode(response);

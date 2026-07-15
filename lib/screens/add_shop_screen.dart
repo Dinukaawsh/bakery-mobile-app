@@ -16,6 +16,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
   final _nameController = TextEditingController();
   final _ownerController = TextEditingController();
   final _addressController = TextEditingController();
+  final _routeController = TextEditingController();
   final _phoneController = TextEditingController();
   String? _error;
   bool _saving = false;
@@ -25,6 +26,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
     _nameController.dispose();
     _ownerController.dispose();
     _addressController.dispose();
+    _routeController.dispose();
     _phoneController.dispose();
     super.dispose();
   }
@@ -50,6 +52,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
         ownerName: ownerName,
         address: address,
         phone: _phoneController.text.trim(),
+        route: _routeController.text.trim(),
       );
       if (!mounted) return;
       Navigator.of(context).pop(shop);
@@ -98,6 +101,15 @@ class _AddShopScreenState extends State<AddShopScreen> {
               border: OutlineInputBorder(),
             ),
             maxLines: 2,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _routeController,
+            decoration: const InputDecoration(
+              labelText: 'Route (optional)',
+              hintText: 'e.g. Route 1, Galle Road',
+              border: OutlineInputBorder(),
+            ),
           ),
           const SizedBox(height: 12),
           TextField(

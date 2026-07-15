@@ -4,6 +4,8 @@ class Shop {
   final String ownerName;
   final String address;
   final String? phone;
+  final String? route;
+  final bool isActive;
 
   const Shop({
     required this.id,
@@ -11,6 +13,8 @@ class Shop {
     required this.ownerName,
     required this.address,
     required this.phone,
+    required this.route,
+    required this.isActive,
   });
 
   factory Shop.fromJson(Map<String, dynamic> json) {
@@ -20,6 +24,8 @@ class Shop {
       ownerName: json['ownerName'] as String,
       address: json['address'] as String,
       phone: json['phone'] as String?,
+      route: json['route'] as String?,
+      isActive: json['isActive'] as bool? ?? true,
     );
   }
 }

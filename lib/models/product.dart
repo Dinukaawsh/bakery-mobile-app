@@ -5,6 +5,7 @@ class Product {
   final String price;
   final String category;
   final int stockAvailable;
+  final bool isActive;
 
   const Product({
     required this.id,
@@ -13,6 +14,7 @@ class Product {
     required this.price,
     required this.category,
     required this.stockAvailable,
+    required this.isActive,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class Product {
       price: json['price'] as String,
       category: json['category'] as String,
       stockAvailable: json['stockAvailable'] as int,
+      isActive: json['isActive'] as bool? ?? true,
     );
   }
 }
