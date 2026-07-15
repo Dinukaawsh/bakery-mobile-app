@@ -5,8 +5,8 @@ import '../models/admin_models.dart';
 import '../models/allocation.dart';
 import '../models/business_settings.dart';
 import '../models/product.dart';
-import '../models/sale.dart';
 import '../models/shop.dart';
+import '../models/shop_drop.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../utils/currency.dart';
@@ -46,15 +46,32 @@ class _AdminShellState extends State<AdminShell> {
     _AdminSection(1, 'nav.products', Icons.inventory_2_outlined),
     _AdminSection(2, 'nav.sales', Icons.payments_outlined),
     _AdminSection(3, 'nav.partners', Icons.local_shipping_outlined),
-    _AdminSection(4, 'nav.assignments', Icons.assignment_outlined),
-    _AdminSection(5, 'nav.shops', Icons.storefront_outlined),
-    _AdminSection(6, 'nav.settings', Icons.settings_outlined),
+    _AdminSection(
+      4,
+      'nav.assignments',
+      Icons.assignment_outlined,
+      children: [
+        _AdminSection(5, 'nav.assignmentHistory', Icons.history_outlined),
+      ],
+    ),
+    _AdminSection(6, 'nav.shops', Icons.storefront_outlined),
+    _AdminSection(7, 'nav.settings', Icons.settings_outlined),
   ];
 
   @override
   void initState() {
     super.initState();
     _businessSettings = widget.businessSettings;
+  }
+
+  _AdminSection _sectionByIndex(int index) {
+    for (final section in _sections) {
+      if (section.index == index) return section;
+      for (final child in section.children) {
+        if (child.index == index) return child;
+      }
+    }
+    return _sections.first;
   }
 
   Future<void> _refreshSettings() async {
@@ -94,8 +111,10 @@ class _AdminShellState extends State<AdminShell> {
       case 4:
         return _AdminAssignmentsPage(apiService: widget.apiService);
       case 5:
-        return _AdminShopsPage(apiService: widget.apiService);
+        return _AdminAssignmentHistoryPage(apiService: widget.apiService);
       case 6:
+        return _AdminShopsPage(apiService: widget.apiService);
+      case 7:
         return _AdminSettingsPage(
           apiService: widget.apiService,
           user: widget.user,
@@ -108,10 +127,15 @@ class _AdminShellState extends State<AdminShell> {
     }
   }
 
+  void _selectSection(int index) {
+    setState(() => _section = index);
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = LocaleScope.of(context).t;
-    final current = _sections[_section];
+    final current = _sectionByIndex(_section);
 
     return Scaffold(
       key: _scaffoldKey,
@@ -172,24 +196,15 @@ class _AdminShellState extends State<AdminShell> {
             ),
             Expanded(
               child: ListView(
-                children: _sections.map((section) {
-                  final selected = _section == section.index;
-                  return ListTile(
-                    leading: Icon(
-                      section.icon,
-                      color: selected
-                          ? const Color(0xFFB45309)
-                          : const Color(0xFF78716C),
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                children: [
+                  for (final section in _sections)
+                    _DrawerNavGroup(
+                      section: section,
+                      currentIndex: _section,
+                      onSelect: _selectSection,
                     ),
-                    title: Text(t(section.labelKey)),
-                    selected: selected,
-                    selectedTileColor: const Color(0xFFFEF3C7),
-                    onTap: () {
-                      setState(() => _section = section.index);
-                      Navigator.of(context).pop();
-                    },
-                  );
-                }).toList(),
+                ],
               ),
             ),
           ],
@@ -200,12 +215,188 @@ class _AdminShellState extends State<AdminShell> {
   }
 }
 
+class _DrawerNavGroup extends StatelessWidget {
+  const _DrawerNavGroup({
+    required this.section,
+    required this.currentIndex,
+    required this.onSelect,
+  });
+
+  final _AdminSection section;
+  final int currentIndex;
+  final ValueChanged<int> onSelect;
+
+  bool get _childActive =>
+      section.children.any((child) => child.index == currentIndex);
+
+  bool get _parentActive => currentIndex == section.index;
+
+  bool get _groupOpen => _parentActive || _childActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+    final hasChildren = section.children.isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: _parentActive
+                ? const Color(0xFFB45309)
+                : _groupOpen
+                    ? const Color(0xFFFFFBEB)
+                    : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => onSelect(section.index),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: _groupOpen && !_parentActive
+                      ? Border.all(color: const Color(0xFFFDE68A))
+                      : null,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: _parentActive
+                            ? Colors.white.withValues(alpha: 0.18)
+                            : const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        section.icon,
+                        size: 20,
+                        color: _parentActive
+                            ? Colors.white
+                            : const Color(0xFFB45309),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        t(section.labelKey),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: _parentActive
+                              ? Colors.white
+                              : const Color(0xFF1C1917),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (hasChildren)
+            Padding(
+              padding: const EdgeInsets.only(left: 18, top: 4),
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  border: Border(
+                    left: BorderSide(color: Color(0xFFFDE68A), width: 2),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: Column(
+                    children: [
+                      for (final child in section.children)
+                        _DrawerNavChild(
+                          section: child,
+                          selected: currentIndex == child.index,
+                          onSelect: onSelect,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DrawerNavChild extends StatelessWidget {
+  const _DrawerNavChild({
+    required this.section,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final _AdminSection section;
+  final bool selected;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Material(
+        color: selected ? const Color(0xFFB45309) : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => onSelect(section.index),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            child: Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selected ? Colors.white : const Color(0xFFFBBF24),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    t(section.labelKey),
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight:
+                          selected ? FontWeight.w600 : FontWeight.w500,
+                      color: selected
+                          ? Colors.white
+                          : const Color(0xFF57534E),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _AdminSection {
-  const _AdminSection(this.index, this.labelKey, this.icon);
+  const _AdminSection(
+    this.index,
+    this.labelKey,
+    this.icon, {
+    this.children = const [],
+  });
 
   final int index;
   final String labelKey;
   final IconData icon;
+  final List<_AdminSection> children;
 }
 
 class _AdminDashboardPage extends StatefulWidget {
@@ -576,7 +767,7 @@ class _AdminSalesPage extends StatefulWidget {
 }
 
 class _AdminSalesPageState extends State<_AdminSalesPage> {
-  List<Sale> _sales = [];
+  List<ShopDropSummary> _groups = [];
   List<DeliveryPartner> _partners = [];
   String? _error;
   bool _todayOnly = false;
@@ -599,19 +790,112 @@ class _AdminSalesPageState extends State<_AdminSalesPage> {
 
   Future<void> _load() async {
     try {
-      final sales = await widget.apiService.fetchSales(
-        today: _todayOnly,
+      final groups = await widget.apiService.fetchShopDrops(
+        date: _todayOnly ? localDateString() : null,
         deliveryGuyId: _partnerId == null ? null : int.tryParse(_partnerId!),
       );
       if (!mounted) return;
       setState(() {
-        _sales = sales;
+        _groups = groups;
         _error = null;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() => _error = error.toString());
     }
+  }
+
+  Future<void> _openGroup(ShopDropSummary group) async {
+    final t = LocaleScope.of(context).t;
+    final saleId = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${group.shopName} · ${group.dropDate}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  t('admin.salesGroupHint'),
+                  style: const TextStyle(color: Color(0xFF78716C)),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${group.deliveryGuyName} · ${group.itemsLabel}',
+                  style: const TextStyle(fontSize: 13),
+                ),
+                Text(
+                  formatCurrencyFromString(group.totalAmount),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: group.sales.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final sale = group.sales[index];
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(sale.saleDate.toLocal().toString()),
+                        subtitle: Text(sale.itemsLabel),
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              formatCurrencyFromString(sale.totalAmount),
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              sale.billPrinted
+                                  ? t('admin.billPrinted')
+                                  : t('admin.viewBill'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: sale.billPrinted
+                                    ? Colors.green
+                                    : const Color(0xFFB45309),
+                              ),
+                            ),
+                          ],
+                        ),
+                        onTap: () => Navigator.of(context).pop(sale.id),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (saleId == null || !mounted) return;
+    await showBillModal(
+      context,
+      apiService: widget.apiService,
+      saleId: saleId,
+      businessSettings: widget.businessSettings,
+    );
+    if (mounted) _load();
   }
 
   @override
@@ -678,7 +962,7 @@ class _AdminSalesPageState extends State<_AdminSalesPage> {
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
-            child: _sales.isEmpty
+            child: _groups.isEmpty
                 ? ListView(
                     children: [
                       const SizedBox(height: 120),
@@ -686,50 +970,30 @@ class _AdminSalesPageState extends State<_AdminSalesPage> {
                     ],
                   )
                 : ListView.builder(
-                    itemCount: _sales.length,
+                    itemCount: _groups.length,
                     itemBuilder: (context, index) {
-                      final sale = _sales[index];
+                      final group = _groups[index];
                       return Card(
                         margin: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 6,
                         ),
                         child: ListTile(
-                          title: Text(sale.shopName),
+                          title: Text(group.shopName),
                           subtitle: Text(
-                            '${sale.deliveryGuyName} • ${sale.saleDate.toLocal()}',
+                            [
+                              group.deliveryGuyName,
+                              group.dropDate,
+                              group.itemsLabel,
+                              t('admin.saleCount', {'count': group.saleCount}),
+                            ].join(' • '),
                           ),
-                          trailing: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                formatCurrencyFromString(sale.totalAmount),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                sale.billPrinted
-                                    ? t('admin.billPrinted')
-                                    : t('admin.viewBill'),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: sale.billPrinted
-                                      ? Colors.green
-                                      : const Color(0xFFB45309),
-                                ),
-                              ),
-                            ],
+                          isThreeLine: true,
+                          trailing: Text(
+                            formatCurrencyFromString(group.totalAmount),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          onTap: () {
-                            showBillModal(
-                              context,
-                              apiService: widget.apiService,
-                              saleId: sale.id,
-                              businessSettings: widget.businessSettings,
-                            );
-                          },
+                          onTap: () => _openGroup(group),
                         ),
                       );
                     },
@@ -1155,6 +1419,195 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
               ),
             ),
           ),
+      ],
+    );
+  }
+}
+
+class _AdminAssignmentHistoryPage extends StatefulWidget {
+  const _AdminAssignmentHistoryPage({required this.apiService});
+
+  final ApiService apiService;
+
+  @override
+  State<_AdminAssignmentHistoryPage> createState() =>
+      _AdminAssignmentHistoryPageState();
+}
+
+class _AdminAssignmentHistoryPageState
+    extends State<_AdminAssignmentHistoryPage> {
+  List<AllocationRecord> _records = [];
+  List<DeliveryPartner> _partners = [];
+  String? _error;
+  String? _partnerFilter;
+  String _dateFrom = '';
+  String _dateTo = '';
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPartners();
+    _load();
+  }
+
+  Future<void> _loadPartners() async {
+    try {
+      final partners = await widget.apiService.fetchDeliveryPartners();
+      if (!mounted) return;
+      setState(() => _partners = partners);
+    } catch (_) {}
+  }
+
+  Future<void> _load() async {
+    try {
+      final from = _dateFrom.trim();
+      final to = _dateTo.trim();
+      final data = await widget.apiService.fetchAdminAllocations(
+        deliveryGuyId:
+            _partnerFilter == null ? null : int.tryParse(_partnerFilter!),
+        historyDate: from.isNotEmpty && to.isEmpty
+            ? from
+            : to.isNotEmpty && from.isEmpty
+                ? to
+                : null,
+        historyDateFrom: from.isNotEmpty && to.isNotEmpty ? from : null,
+        historyDateTo: from.isNotEmpty && to.isNotEmpty ? to : null,
+      );
+      if (!mounted) return;
+      setState(() {
+        _records = data.records;
+        _error = null;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  void _reload() {
+    setState(() => _loading = true);
+    _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Column(
+            children: [
+              TextFormField(
+                initialValue: _dateFrom,
+                decoration: InputDecoration(
+                  labelText: t('admin.dateFrom'),
+                  hintText: t('admin.optionalDateHint'),
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                ),
+                onChanged: (value) => _dateFrom = value,
+                onFieldSubmitted: (_) => _reload(),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                initialValue: _dateTo,
+                decoration: InputDecoration(
+                  labelText: t('admin.dateTo'),
+                  hintText: t('admin.optionalDateHint'),
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                ),
+                onChanged: (value) => _dateTo = value,
+                onFieldSubmitted: (_) => _reload(),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String?>(
+                value: _partnerFilter,
+                decoration: InputDecoration(
+                  labelText: t('admin.filterByPartner'),
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                ),
+                items: [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text(t('admin.allPartners')),
+                  ),
+                  ..._partners.map(
+                    (partner) => DropdownMenuItem<String?>(
+                      value: partner.id.toString(),
+                      child: Text(partner.name),
+                    ),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() => _partnerFilter = value);
+                  _reload();
+                },
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton(
+                  onPressed: _reload,
+                  child: Text(t('common.refresh')),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(_error!, style: const TextStyle(color: Colors.red)),
+          ),
+        Expanded(
+          child: _loading && _records.isEmpty
+              ? const Center(child: CircularProgressIndicator())
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: _records.isEmpty
+                      ? ListView(
+                          children: [
+                            const SizedBox(height: 120),
+                            Center(
+                              child: Text(t('admin.noAssignmentHistory')),
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
+                          itemCount: _records.length,
+                          itemBuilder: (context, index) {
+                            final row = _records[index];
+                            return Card(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 6,
+                              ),
+                              child: ListTile(
+                                title: Text(row.productName),
+                                subtitle: Text(
+                                  '${row.deliveryGuyName} • ${row.allocationDate}',
+                                ),
+                                trailing: Text(
+                                  '${row.quantity}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+        ),
       ],
     );
   }

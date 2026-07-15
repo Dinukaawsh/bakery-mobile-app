@@ -202,11 +202,15 @@ class ApiService {
     String? date,
     String? dateFrom,
     String? dateTo,
+    int? deliveryGuyId,
   }) async {
     final params = <String, String>{};
     if (date != null) params['date'] = date;
     if (dateFrom != null) params['dateFrom'] = dateFrom;
     if (dateTo != null) params['dateTo'] = dateTo;
+    if (deliveryGuyId != null) {
+      params['deliveryGuyId'] = deliveryGuyId.toString();
+    }
 
     final uri = Uri.parse('$_baseUrl/api/shops/drops').replace(
       queryParameters: params.isEmpty ? null : params,
@@ -296,12 +300,24 @@ class ApiService {
   })> fetchAdminAllocations({
     String? date,
     int? deliveryGuyId,
+    String? historyDate,
+    String? historyDateFrom,
+    String? historyDateTo,
   }) async {
     final params = <String, String>{
       'date': date ?? _localDateString(),
     };
     if (deliveryGuyId != null) {
       params['deliveryGuyId'] = deliveryGuyId.toString();
+    }
+    if (historyDate != null && historyDate.isNotEmpty) {
+      params['historyDate'] = historyDate;
+    }
+    if (historyDateFrom != null && historyDateFrom.isNotEmpty) {
+      params['historyDateFrom'] = historyDateFrom;
+    }
+    if (historyDateTo != null && historyDateTo.isNotEmpty) {
+      params['historyDateTo'] = historyDateTo;
     }
 
     final uri = Uri.parse('$_baseUrl/api/allocations').replace(

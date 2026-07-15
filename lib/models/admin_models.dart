@@ -5,6 +5,7 @@ class AllocationRecord {
   final int productId;
   final String productName;
   final int quantity;
+  final String allocationDate;
 
   const AllocationRecord({
     required this.id,
@@ -13,6 +14,7 @@ class AllocationRecord {
     required this.productId,
     required this.productName,
     required this.quantity,
+    required this.allocationDate,
   });
 
   factory AllocationRecord.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class AllocationRecord {
       productId: json['productId'] as int,
       productName: json['productName'] as String,
       quantity: json['quantity'] as int,
+      allocationDate: json['allocationDate'] as String? ?? '',
     );
   }
 }
