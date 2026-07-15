@@ -130,6 +130,180 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
     if (shouldLogout) widget.onLogout();
   }
 
+  int get _totalAssigned =>
+      _allocations.fold(0, (sum, item) => sum + item.allocated);
+  int get _totalSold =>
+      _allocations.fold(0, (sum, item) => sum + item.sold);
+  int get _totalLeft =>
+      _allocations.fold(0, (sum, item) => sum + item.remaining);
+
+  Widget _stockStat({
+    required String label,
+    required int value,
+    required Color color,
+  }) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            '$value',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: color,
+              height: 1.1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF57534E),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stockSummaryBanner(String Function(String, [Map<String, Object?>?]) t) {
+    final empty = _allocations.isEmpty;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => setState(() => _tab = 2),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
+            ),
+            border: Border.all(color: const Color(0xFFFDBA74)),
+          ),
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.inventory_2_outlined,
+                    size: 18,
+                    color: Color(0xFFB45309),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      t('delivery.stockTodayTitle'),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF92400E),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  if (_tab != 2)
+                    Text(
+                      t('delivery.myStock'),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFB45309),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              if (empty)
+                Text(
+                  t('delivery.noStockToday'),
+                  style: const TextStyle(color: Color(0xFF78716C)),
+                )
+              else
+                Row(
+                  children: [
+                    _stockStat(
+                      label: t('delivery.stockAssigned'),
+                      value: _totalAssigned,
+                      color: const Color(0xFF1C1917),
+                    ),
+                    Container(width: 1, height: 36, color: const Color(0xFFFDBA74)),
+                    _stockStat(
+                      label: t('delivery.stockSold'),
+                      value: _totalSold,
+                      color: const Color(0xFF15803D),
+                    ),
+                    Container(width: 1, height: 36, color: const Color(0xFFFDBA74)),
+                    _stockStat(
+                      label: t('delivery.stockLeft'),
+                      value: _totalLeft,
+                      color: const Color(0xFFB45309),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _stockProductCard(
+    AllocationSummary item,
+    String Function(String, [Map<String, Object?>?]) t,
+  ) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE7E5E4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            item.productName,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+              color: Color(0xFF1C1917),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _stockStat(
+                label: t('delivery.stockAssigned'),
+                value: item.allocated,
+                color: const Color(0xFF1C1917),
+              ),
+              Container(width: 1, height: 32, color: const Color(0xFFE7E5E4)),
+              _stockStat(
+                label: t('delivery.stockSold'),
+                value: item.sold,
+                color: const Color(0xFF15803D),
+              ),
+              Container(width: 1, height: 32, color: const Color(0xFFE7E5E4)),
+              _stockStat(
+                label: t('delivery.stockLeft'),
+                value: item.remaining,
+                color: const Color(0xFFB45309),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = LocaleScope.of(context).t;
@@ -198,6 +372,10 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
               },
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: _stockSummaryBanner(t),
+          ),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.all(12),
@@ -218,29 +396,26 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                                 child: Text(t('delivery.noStockToday')),
                               ),
                             ]
-                          : _allocations
-                              .map(
-                                (item) => Card(
-                                  margin: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
-                                  ),
-                                  child: ListTile(
-                                    title: Text(item.productName),
-                                    subtitle: Text(
-                                      t(
-                                        'delivery.givenSoldLeft',
-                                        {
-                                          'given': item.allocated,
-                                          'sold': item.sold,
-                                          'left': item.remaining,
-                                        },
-                                      ),
-                                    ),
+                          : [
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  4,
+                                  16,
+                                  8,
+                                ),
+                                child: Text(
+                                  t('delivery.stockSummaryHint'),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF78716C),
                                   ),
                                 ),
-                              )
-                              .toList(),
+                              ),
+                              ..._allocations.map(
+                                (item) => _stockProductCard(item, t),
+                              ),
+                            ],
                     )
                   : _tab == 1
                       ? ListView(
@@ -677,46 +852,65 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
           else
             ..._availableAllocations.map((allocation) {
               final qty = _quantities[allocation.productId] ?? 0;
-              return ListTile(
-                title: Text(allocation.productName),
-                subtitle: Text(
-                  t(
-                    'delivery.assignedSoldLeft',
-                    {
-                      'assigned': allocation.allocated,
-                      'sold': allocation.sold,
-                      'left': allocation.remaining,
-                    },
-                  ),
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE7E5E4)),
                 ),
-                trailing: SizedBox(
-                  width: 120,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        onPressed: qty > 0
-                            ? () => setState(
-                                  () =>
-                                      _quantities[allocation.productId] =
-                                          qty - 1,
-                                )
-                            : null,
-                        icon: const Icon(Icons.remove),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            allocation.productName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '${t('delivery.stockAssigned')}: ${allocation.allocated}  ·  '
+                            '${t('delivery.stockSold')}: ${allocation.sold}  ·  '
+                            '${t('delivery.stockLeft')}: ${allocation.remaining}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF57534E),
+                            ),
+                          ),
+                        ],
                       ),
-                      Text('$qty'),
-                      IconButton(
-                        onPressed: qty < allocation.remaining
-                            ? () => setState(
-                                  () =>
-                                      _quantities[allocation.productId] =
-                                          qty + 1,
-                                )
-                            : null,
-                        icon: const Icon(Icons.add),
+                    ),
+                    IconButton(
+                      onPressed: qty > 0
+                          ? () => setState(
+                                () => _quantities[allocation.productId] =
+                                    qty - 1,
+                              )
+                          : null,
+                      icon: const Icon(Icons.remove),
+                    ),
+                    Text(
+                      '$qty',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
                       ),
-                    ],
-                  ),
+                    ),
+                    IconButton(
+                      onPressed: qty < allocation.remaining
+                          ? () => setState(
+                                () => _quantities[allocation.productId] =
+                                    qty + 1,
+                              )
+                          : null,
+                      icon: const Icon(Icons.add),
+                    ),
+                  ],
                 ),
               );
             }),
