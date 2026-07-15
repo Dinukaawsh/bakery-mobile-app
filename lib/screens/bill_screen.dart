@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/locale_scope.dart';
 import '../models/business_settings.dart';
 import '../models/sale.dart';
 import '../services/api_service.dart';
@@ -99,6 +100,7 @@ class _BillScreenState extends State<BillScreen> {
   Future<void> _savePayment() async {
     final sale = _sale;
     if (sale == null || _savingPayment) return;
+    final t = LocaleScope.of(context).t;
 
     setState(() => _savingPayment = true);
     try {
@@ -112,7 +114,7 @@ class _BillScreenState extends State<BillScreen> {
         _paidController.text = updated.paidAmount;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment saved')),
+        SnackBar(content: Text(t('bill.paymentSaved'))),
       );
     } catch (error) {
       if (!mounted) return;
@@ -129,6 +131,7 @@ class _BillScreenState extends State<BillScreen> {
   Future<void> _printBill() async {
     final sale = _sale;
     if (sale == null || _printing) return;
+    final t = LocaleScope.of(context).t;
 
     setState(() => _printing = true);
     try {
@@ -140,12 +143,13 @@ class _BillScreenState extends State<BillScreen> {
 
       await printBillReceipt(
         settings: widget.businessSettings,
-        billNumberLabel: 'Delivery Bill #${current.id}',
+        billNumberLabel: t('bill.billNumber', {'id': current.id}),
         shopName: current.shopName,
         deliveryName: current.deliveryGuyName,
         saleDate: current.saleDate,
         items: _lineItems(current),
         totalAmount: _todayTotal(current),
+        t: t,
         previousBalance: _previous(current),
         paidAmount: double.tryParse(current.paidAmount) ?? paid,
         remainingAfter: double.tryParse(current.remainingAfter),
@@ -165,14 +169,19 @@ class _BillScreenState extends State<BillScreen> {
         _paidController.text = current.paidAmount;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bill sent to printer')),
+        SnackBar(content: Text(t('bill.sentToPrinter'))),
       );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            error.toString().replaceFirst('Exception: ', 'Print failed: '),
+            t(
+              'bill.printFailed',
+              {
+                'error': error.toString().replaceFirst('Exception: ', ''),
+              },
+            ),
           ),
         ),
       );
@@ -184,11 +193,12 @@ class _BillScreenState extends State<BillScreen> {
   @override
   Widget build(BuildContext context) {
     final sale = _sale;
+    final t = LocaleScope.of(context).t;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFFBEB),
       appBar: AppBar(
-        title: const Text('Delivery bill'),
+        title: Text(t('bill.title')),
         backgroundColor: const Color(0xFFB45309),
         foregroundColor: Colors.white,
         automaticallyImplyLeading: !widget.embedded,
@@ -197,6 +207,7 @@ class _BillScreenState extends State<BillScreen> {
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(true),
                   icon: const Icon(Icons.close),
+                  tooltip: t('common.close'),
                 ),
               ]
             : null,
@@ -219,7 +230,8 @@ class _BillScreenState extends State<BillScreen> {
                   children: [
                     BillReceiptCard(
                       settings: widget.businessSettings,
-                      billNumberLabel: 'Delivery Bill #${sale!.id}',
+                      billNumberLabel:
+                          t('bill.billNumber', {'id': sale!.id}),
                       shopName: sale.shopName,
                       deliveryName: sale.deliveryGuyName,
                       saleDate: sale.saleDate,
@@ -236,12 +248,17 @@ class _BillScreenState extends State<BillScreen> {
                     const SizedBox(height: 16),
                     TextField(
                       controller: _paidController,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: InputDecoration(
-                        labelText: 'Amount paid (Rs)',
-                        helperText:
-                            'Total due: ${formatCurrency(_amountDue(sale))}',
+                        labelText: t('bill.amountPaid'),
+                        helperText: t(
+                          'bill.totalDueHelper',
+                          {
+                            'amount': formatCurrency(_amountDue(sale)),
+                          },
+                        ),
                         border: const OutlineInputBorder(),
                       ),
                       onChanged: (_) => setState(() {}),
@@ -254,7 +271,9 @@ class _BillScreenState extends State<BillScreen> {
                         minimumSize: const Size.fromHeight(48),
                       ),
                       child: Text(
-                        _savingPayment ? 'Saving payment...' : 'Save payment',
+                        _savingPayment
+                            ? t('bill.savingPayment')
+                            : t('bill.savePayment'),
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -272,10 +291,10 @@ class _BillScreenState extends State<BillScreen> {
                           : const Icon(Icons.print_rounded),
                       label: Text(
                         _printing
-                            ? 'Opening printer...'
+                            ? t('bill.openingPrinter')
                             : sale.billPrinted
-                                ? 'Print again'
-                                : 'Print bill for shop',
+                                ? t('bill.printAgain')
+                                : t('bill.printForShop'),
                       ),
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFFB45309),
@@ -290,7 +309,7 @@ class _BillScreenState extends State<BillScreen> {
                         foregroundColor: const Color(0xFFB45309),
                         side: const BorderSide(color: Color(0xFFFDE68A)),
                       ),
-                      child: const Text('Done'),
+                      child: Text(t('bill.done')),
                     ),
                   ],
                 ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/locale_scope.dart';
 import '../utils/currency.dart';
 import '../utils/dates.dart';
 import '../models/allocation.dart';
@@ -13,6 +14,7 @@ import '../services/api_service.dart';
 import '../widgets/bill_modal.dart';
 import '../widgets/bill_receipt_card.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/locale_toggle.dart';
 import 'account_settings_screen.dart';
 import 'add_shop_screen.dart';
 
@@ -113,13 +115,13 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
   }
 
   Future<void> _confirmLogout() async {
+    final t = LocaleScope.of(context).t;
     final shouldLogout = await showConfirmDialog(
       context,
-      title: 'Sign out?',
-      message:
-          'You will need to sign in again to record deliveries and print bills.',
-      confirmLabel: 'Sign out',
-      cancelLabel: 'Stay signed in',
+      title: t('delivery.logoutConfirmTitle'),
+      message: t('delivery.logoutConfirmMessage'),
+      confirmLabel: t('common.logout'),
+      cancelLabel: t('common.cancel'),
       isDanger: true,
     );
     if (shouldLogout) widget.onLogout();
@@ -127,6 +129,8 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+
     return Scaffold(
       backgroundColor: const Color(0xFFFFFBEB),
       appBar: AppBar(
@@ -134,7 +138,9 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
         backgroundColor: const Color(0xFFB45309),
         foregroundColor: Colors.white,
         actions: [
+          const LocaleToggle(),
           IconButton(
+            tooltip: t('delivery.accountSettings'),
             onPressed: () async {
               final updated = await Navigator.of(context).push<AppUser>(
                 MaterialPageRoute(
@@ -148,15 +154,23 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
             },
             icon: const Icon(Icons.person),
           ),
-          IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
-          IconButton(onPressed: _confirmLogout, icon: const Icon(Icons.logout)),
+          IconButton(
+            tooltip: t('common.refresh'),
+            onPressed: _load,
+            icon: const Icon(Icons.refresh),
+          ),
+          IconButton(
+            tooltip: t('common.logout'),
+            onPressed: _confirmLogout,
+            icon: const Icon(Icons.logout),
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openCreateDelivery,
         backgroundColor: const Color(0xFFB45309),
         foregroundColor: Colors.white,
-        label: const Text('New delivery'),
+        label: Text(t('delivery.titleNew')),
         icon: const Icon(Icons.add),
       ),
       body: Column(
@@ -164,16 +178,19 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: SegmentedButton<int>(
-            segments: const [
-              ButtonSegment(value: 0, label: Text('Today')),
-              ButtonSegment(value: 1, label: Text('Last 7 days')),
-              ButtonSegment(value: 2, label: Text('My stock')),
-            ],
-            selected: {_tab},
-            onSelectionChanged: (value) {
-              setState(() => _tab = value.first);
-            },
-          ),
+              segments: [
+                ButtonSegment(value: 0, label: Text(t('delivery.today'))),
+                ButtonSegment(
+                  value: 1,
+                  label: Text(t('delivery.last7Days')),
+                ),
+                ButtonSegment(value: 2, label: Text(t('delivery.myStock'))),
+              ],
+              selected: {_tab},
+              onSelectionChanged: (value) {
+                setState(() => _tab = value.first);
+              },
+            ),
           ),
           if (_error != null)
             Padding(
@@ -187,9 +204,9 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                   ? ListView(
                       children: _allocations.isEmpty
                           ? [
-                              const Padding(
-                                padding: EdgeInsets.all(24),
-                                child: Text('No stock assigned today.'),
+                              Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Text(t('delivery.noStockToday')),
                               ),
                             ]
                           : _allocations
@@ -202,7 +219,14 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                                   child: ListTile(
                                     title: Text(item.productName),
                                     subtitle: Text(
-                                      'Given: ${item.allocated} • Sold: ${item.sold} • Left: ${item.remaining}',
+                                      t(
+                                        'delivery.givenSoldLeft',
+                                        {
+                                          'given': item.allocated,
+                                          'sold': item.sold,
+                                          'left': item.remaining,
+                                        },
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -213,11 +237,9 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                       ? ListView(
                           children: _recentDrops.isEmpty
                               ? [
-                                  const Padding(
-                                    padding: EdgeInsets.all(24),
-                                    child: Text(
-                                      'No shop drops in the last 7 days.',
-                                    ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(24),
+                                    child: Text(t('delivery.noDropsPeriod')),
                                   ),
                                 ]
                               : _recentDrops
@@ -246,13 +268,20 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                                               CrossAxisAlignment.end,
                                           children: [
                                             Text(
-                                              formatCurrencyFromString(drop.totalAmount),
+                                              formatCurrencyFromString(
+                                                drop.totalAmount,
+                                              ),
                                               style: const TextStyle(
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
                                             Text(
-                                              '${drop.totalQuantity} items',
+                                              t(
+                                                'delivery.itemsCount',
+                                                {
+                                                  'count': drop.totalQuantity,
+                                                },
+                                              ),
                                               style: const TextStyle(
                                                 fontSize: 12,
                                               ),
@@ -267,9 +296,11 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                       : ListView(
                           children: _todaySales.isEmpty
                               ? [
-                                  const Padding(
-                                    padding: EdgeInsets.all(24),
-                                    child: Text('No deliveries recorded today.'),
+                                  Padding(
+                                    padding: const EdgeInsets.all(24),
+                                    child: Text(
+                                      t('delivery.noDeliveriesToday'),
+                                    ),
                                   ),
                                 ]
                               : _todaySales
@@ -291,15 +322,17 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                                               CrossAxisAlignment.end,
                                           children: [
                                             Text(
-                                              formatCurrencyFromString(sale.totalAmount),
+                                              formatCurrencyFromString(
+                                                sale.totalAmount,
+                                              ),
                                               style: const TextStyle(
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
                                             Text(
                                               sale.billPrinted
-                                                  ? 'Bill printed'
-                                                  : 'Bill pending',
+                                                  ? t('delivery.billPrinted')
+                                                  : t('delivery.billPending'),
                                               style: TextStyle(
                                                 fontSize: 12,
                                                 color: sale.billPrinted
@@ -476,8 +509,9 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
   }
 
   Future<void> _submit() async {
+    final t = LocaleScope.of(context).t;
     if (_selectedShop == null) {
-      setState(() => _error = 'Select a shop');
+      setState(() => _error = t('delivery.selectShopFirst'));
       return;
     }
 
@@ -487,7 +521,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
         .toList();
 
     if (items.isEmpty) {
-      setState(() => _error = 'Add at least one product');
+      setState(() => _error = t('delivery.addAtLeastOneProduct'));
       return;
     }
 
@@ -516,14 +550,18 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+
     return Scaffold(
       backgroundColor: const Color(0xFFFFFBEB),
       appBar: AppBar(
-        title: const Text('Record delivery'),
+        title: Text(t('delivery.recordDelivery')),
         backgroundColor: const Color(0xFFB45309),
         foregroundColor: Colors.white,
         actions: [
+          const LocaleToggle(),
           IconButton(
+            tooltip: t('delivery.refreshStock'),
             onPressed: _loadingAllocations ? null : _loadAllocations,
             icon: const Icon(Icons.refresh),
           ),
@@ -535,14 +573,14 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
           if (_routeOptions.isNotEmpty) ...[
             DropdownButtonFormField<String?>(
               value: _routeFilter,
-              decoration: const InputDecoration(
-                labelText: 'Filter by route',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: t('delivery.filterByRoute'),
+                border: const OutlineInputBorder(),
               ),
               items: [
-                const DropdownMenuItem<String?>(
+                DropdownMenuItem<String?>(
                   value: null,
-                  child: Text('All routes'),
+                  child: Text(t('delivery.allRoutes')),
                 ),
                 ..._routeOptions.map(
                   (route) => DropdownMenuItem<String?>(
@@ -568,9 +606,9 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
               Expanded(
                 child: DropdownButtonFormField<Shop>(
                   value: _selectedShop,
-                  decoration: const InputDecoration(
-                    labelText: 'Shop',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: t('common.shop'),
+                    border: const OutlineInputBorder(),
                   ),
                   items: _filteredShops
                       .map(
@@ -583,7 +621,9 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                                   ? ''
                                   : ' (${shop.route})';
                               final owes = shop.outstandingAsDouble > 0
-                                  ? ' • Owes ${shop.outstandingBalance}'
+                                  ? ' • ${t('delivery.owes', {
+                                        'amount': shop.outstandingBalance,
+                                      })}'
                                   : '';
                               return '${shop.name}$route$owes';
                             }(),
@@ -600,14 +640,17 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
           OutlinedButton.icon(
             onPressed: _openAddShop,
             icon: const Icon(Icons.add_business_outlined),
-            label: const Text('Add new shop'),
+            label: Text(t('delivery.addNewShop')),
           ),
           if (_shops.isEmpty) ...[
             const SizedBox(height: 8),
-            const Text('No shops yet. Add a shop to record this delivery.'),
+            Text(t('delivery.noShopsYet')),
           ],
           const SizedBox(height: 16),
-          Text('Products to deliver', style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            t('delivery.productsToDeliver'),
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           const SizedBox(height: 8),
           const SizedBox(height: 8),
           if (_loadingAllocations)
@@ -616,51 +659,60 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
               child: Center(child: CircularProgressIndicator()),
             )
           else if (_availableAllocations.isEmpty)
-            const Text(
-              'No stock assigned to you today. Ask admin to assign stock, or tap refresh after a new assignment.',
-            )
+            Text(t('delivery.noStockAssignedHint'))
           else
             ..._availableAllocations.map((allocation) {
-            final qty = _quantities[allocation.productId] ?? 0;
-            return ListTile(
-              title: Text(allocation.productName),
-              subtitle: Text(
-                'Assigned: ${allocation.allocated} • Sold: ${allocation.sold} • Left: ${allocation.remaining}',
-              ),
-              trailing: SizedBox(
-                width: 120,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(
-                      onPressed: qty > 0
-                          ? () => setState(
-                                () => _quantities[allocation.productId] = qty - 1,
-                              )
-                          : null,
-                      icon: const Icon(Icons.remove),
-                    ),
-                    Text('$qty'),
-                    IconButton(
-                      onPressed: qty < allocation.remaining
-                          ? () => setState(
-                                () => _quantities[allocation.productId] = qty + 1,
-                              )
-                          : null,
-                      icon: const Icon(Icons.add),
-                    ),
-                  ],
+              final qty = _quantities[allocation.productId] ?? 0;
+              return ListTile(
+                title: Text(allocation.productName),
+                subtitle: Text(
+                  t(
+                    'delivery.assignedSoldLeft',
+                    {
+                      'assigned': allocation.allocated,
+                      'sold': allocation.sold,
+                      'left': allocation.remaining,
+                    },
+                  ),
                 ),
-              ),
-            );
-          }),
+                trailing: SizedBox(
+                  width: 120,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        onPressed: qty > 0
+                            ? () => setState(
+                                  () =>
+                                      _quantities[allocation.productId] =
+                                          qty - 1,
+                                )
+                            : null,
+                        icon: const Icon(Icons.remove),
+                      ),
+                      Text('$qty'),
+                      IconButton(
+                        onPressed: qty < allocation.remaining
+                            ? () => setState(
+                                  () =>
+                                      _quantities[allocation.productId] =
+                                          qty + 1,
+                                )
+                            : null,
+                        icon: const Icon(Icons.add),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
           const SizedBox(height: 16),
           TextField(
             controller: _notesController,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              labelText: 'Notes',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t('delivery.notesOptional'),
+              border: const OutlineInputBorder(),
             ),
             maxLines: 2,
           ),
@@ -670,15 +722,15 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
           ],
           const SizedBox(height: 20),
           Text(
-            'Bill preview',
+            t('delivery.billPreview'),
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'This is how the bill will look for the shop owner before you print it.',
-            style: TextStyle(color: Color(0xFF57534E), fontSize: 13),
+          Text(
+            t('delivery.billPreviewHint'),
+            style: const TextStyle(color: Color(0xFF57534E), fontSize: 13),
           ),
           const SizedBox(height: 12),
           if (_loadingProducts)
@@ -689,8 +741,8 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
           else
             BillReceiptCard(
               settings: widget.businessSettings,
-              billNumberLabel: 'Delivery Bill (preview)',
-              shopName: _selectedShop?.name ?? 'Select a shop',
+              billNumberLabel: t('delivery.billPreviewLabel'),
+              shopName: _selectedShop?.name ?? t('delivery.selectShopFirst'),
               deliveryName: widget.user.name,
               saleDate: DateTime.now(),
               items: _previewItems,
@@ -713,7 +765,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
               minimumSize: const Size.fromHeight(52),
             ),
             child: Text(
-              _saving ? 'Saving...' : 'Save delivery',
+              _saving ? t('delivery.saving') : t('delivery.saveDelivery'),
             ),
           ),
         ],

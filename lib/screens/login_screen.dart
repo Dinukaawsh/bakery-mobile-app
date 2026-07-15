@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/locale_scope.dart';
 import '../models/business_settings.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../widgets/locale_toggle.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
@@ -82,35 +84,47 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Column(
-                  children: [
-                    _BrandHeader(
-                      businessName: settings.businessName,
-                      address: settings.address,
-                      contactLine: contactLine,
+          child: Stack(
+            children: [
+              Center(
+                child: SingleChildScrollView(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Column(
+                      children: [
+                        _BrandHeader(
+                          businessName: settings.businessName,
+                          address: settings.address,
+                          contactLine: contactLine,
+                        ),
+                        const SizedBox(height: 28),
+                        _LoginCard(
+                          formKey: _formKey,
+                          emailController: _emailController,
+                          passwordController: _passwordController,
+                          obscurePassword: _obscurePassword,
+                          loading: _loading,
+                          error: _error,
+                          onTogglePassword: () {
+                            setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            );
+                          },
+                          onSubmit: _submit,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 28),
-                    _LoginCard(
-                      formKey: _formKey,
-                      emailController: _emailController,
-                      passwordController: _passwordController,
-                      obscurePassword: _obscurePassword,
-                      loading: _loading,
-                      error: _error,
-                      onTogglePassword: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
-                      },
-                      onSubmit: _submit,
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
+              const Positioned(
+                top: 8,
+                right: 16,
+                child: LocaleToggleLight(),
+              ),
+            ],
           ),
         ),
       ),
@@ -223,6 +237,8 @@ class _LoginCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
@@ -244,16 +260,16 @@ class _LoginCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Welcome back',
+              t('login.welcome'),
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Sign in to record deliveries and manage your route.',
-              style: TextStyle(color: Color(0xFF57534E), height: 1.4),
+            Text(
+              t('login.subtitle'),
+              style: const TextStyle(color: Color(0xFF57534E), height: 1.4),
             ),
             const SizedBox(height: 24),
             TextFormField(
@@ -261,14 +277,14 @@ class _LoginCard extends StatelessWidget {
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
               autocorrect: false,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                prefixIcon: Icon(Icons.mail_outline_rounded),
+              decoration: InputDecoration(
+                labelText: t('login.email'),
+                prefixIcon: const Icon(Icons.mail_outline_rounded),
               ),
               validator: (value) {
                 final email = value?.trim() ?? '';
-                if (email.isEmpty) return 'Enter your email';
-                if (!email.contains('@')) return 'Enter a valid email';
+                if (email.isEmpty) return t('login.emailRequired');
+                if (!email.contains('@')) return t('login.emailInvalid');
                 return null;
               },
             ),
@@ -279,7 +295,7 @@ class _LoginCard extends StatelessWidget {
               textInputAction: TextInputAction.done,
               onFieldSubmitted: (_) => onSubmit(),
               decoration: InputDecoration(
-                labelText: 'Password',
+                labelText: t('login.password'),
                 prefixIcon: const Icon(Icons.lock_outline_rounded),
                 suffixIcon: IconButton(
                   onPressed: onTogglePassword,
@@ -292,7 +308,7 @@ class _LoginCard extends StatelessWidget {
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Enter your password';
+                  return t('login.passwordRequired');
                 }
                 return null;
               },
@@ -300,7 +316,8 @@ class _LoginCard extends StatelessWidget {
             if (error != null) ...[
               const SizedBox(height: 16),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFEF2F2),
                   borderRadius: BorderRadius.circular(12),
@@ -349,9 +366,9 @@ class _LoginCard extends StatelessWidget {
                         color: Colors.white,
                       ),
                     )
-                  : const Text(
-                      'Sign in',
-                      style: TextStyle(
+                  : Text(
+                      t('login.signIn'),
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -368,7 +385,7 @@ class _LoginCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'Delivery partners & admin access',
+                  t('login.accessHint'),
                   style: TextStyle(
                     color: Colors.grey.shade600,
                     fontSize: 13,

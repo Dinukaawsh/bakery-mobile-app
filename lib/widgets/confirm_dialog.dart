@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/locale_scope.dart';
+
 Future<bool> showConfirmDialog(
   BuildContext context, {
   required String title,
   required String message,
-  String confirmLabel = 'Confirm',
-  String cancelLabel = 'Cancel',
+  String? confirmLabel,
+  String? cancelLabel,
   bool isDanger = false,
 }) async {
+  final t = LocaleScope.of(context).t;
+  final resolvedConfirm = confirmLabel ?? t('common.confirm');
+  final resolvedCancel = cancelLabel ?? t('common.cancel');
+
   final result = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
@@ -26,7 +32,7 @@ Future<bool> showConfirmDialog(
                   foregroundColor: const Color(0xFFB45309),
                   side: const BorderSide(color: Color(0xFFFDE68A)),
                 ),
-                child: Text(cancelLabel),
+                child: Text(resolvedCancel),
               ),
             ),
             const SizedBox(width: 12),
@@ -38,7 +44,7 @@ Future<bool> showConfirmDialog(
                   backgroundColor:
                       isDanger ? Colors.red.shade700 : const Color(0xFFB45309),
                 ),
-                child: Text(confirmLabel),
+                child: Text(resolvedConfirm),
               ),
             ),
           ],

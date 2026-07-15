@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/locale_scope.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 
@@ -61,6 +62,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   }
 
   Future<void> _submit() async {
+    final t = LocaleScope.of(context).t;
     final newPassword = _newPasswordController.text;
     final confirmPassword = _confirmPasswordController.text;
     final email = _emailController.text.trim();
@@ -68,14 +70,12 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         newPassword.isNotEmpty || email != _originalEmail;
 
     if (newPassword.isNotEmpty && newPassword != confirmPassword) {
-      setState(() => _error = 'New passwords do not match');
+      setState(() => _error = t('account.passwordMismatch'));
       return;
     }
 
     if (changingCredentials && _currentPasswordController.text.isEmpty) {
-      setState(
-        () => _error = 'Enter current password to change email or password',
-      );
+      setState(() => _error = t('account.currentPasswordRequired'));
       return;
     }
 
@@ -97,7 +97,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
       if (!mounted) return;
       setState(() {
-        _message = 'Account updated';
+        _message = t('account.updated');
         _originalEmail = updated.email;
       });
       Navigator.of(context).pop(updated);
@@ -111,65 +111,67 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Account settings')),
+      appBar: AppBar(title: Text(t('account.title'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           TextField(
             controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: 'Name',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t('account.name'),
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t('account.email'),
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _phoneController,
-            decoration: const InputDecoration(
-              labelText: 'Phone',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t('account.phone'),
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 24),
           Text(
-            'Enter current password when changing email or password.',
+            t('account.passwordHint'),
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _currentPasswordController,
             obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Current password',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t('account.currentPassword'),
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _newPasswordController,
             obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'New password',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t('account.newPassword'),
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _confirmPasswordController,
             obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Confirm new password',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t('account.confirmPassword'),
+              border: const OutlineInputBorder(),
             ),
           ),
           if (_error != null) ...[
@@ -183,7 +185,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           const SizedBox(height: 16),
           FilledButton(
             onPressed: _saving ? null : _submit,
-            child: Text(_saving ? 'Saving...' : 'Save changes'),
+            child: Text(
+              _saving ? t('account.saving') : t('account.save'),
+            ),
           ),
         ],
       ),

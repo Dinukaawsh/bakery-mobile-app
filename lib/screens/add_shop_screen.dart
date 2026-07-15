@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../models/shop.dart';
+import '../l10n/locale_scope.dart';
 import '../services/api_service.dart';
 
 class AddShopScreen extends StatefulWidget {
@@ -32,12 +32,13 @@ class _AddShopScreenState extends State<AddShopScreen> {
   }
 
   Future<void> _submit() async {
+    final t = LocaleScope.of(context).t;
     final name = _nameController.text.trim();
     final ownerName = _ownerController.text.trim();
     final address = _addressController.text.trim();
 
     if (name.isEmpty || ownerName.isEmpty || address.isEmpty) {
-      setState(() => _error = 'Shop name, owner, and address are required');
+      setState(() => _error = t('addShop.requiredFields'));
       return;
     }
 
@@ -65,59 +66,59 @@ class _AddShopScreenState extends State<AddShopScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add shop'),
+        title: Text(t('addShop.title')),
         backgroundColor: Colors.amber.shade800,
         foregroundColor: Colors.white,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
-            'Add a new shop on your route. It will appear for deliveries and in the admin panel.',
-          ),
+          Text(t('addShop.subtitle')),
           const SizedBox(height: 16),
           TextField(
             controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: 'Shop name',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t('addShop.shopName'),
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _ownerController,
-            decoration: const InputDecoration(
-              labelText: 'Owner name',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t('addShop.ownerName'),
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _addressController,
-            decoration: const InputDecoration(
-              labelText: 'Address',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t('addShop.address'),
+              border: const OutlineInputBorder(),
             ),
             maxLines: 2,
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _routeController,
-            decoration: const InputDecoration(
-              labelText: 'Route (optional)',
-              hintText: 'e.g. Route 1, Galle Road',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t('addShop.routeOptional'),
+              hintText: t('addShop.routeHint'),
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
-              labelText: 'Phone (optional)',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: t('addShop.phoneOptional'),
+              border: const OutlineInputBorder(),
             ),
           ),
           if (_error != null) ...[
@@ -127,7 +128,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
           const SizedBox(height: 20),
           FilledButton(
             onPressed: _saving ? null : _submit,
-            child: Text(_saving ? 'Saving...' : 'Save shop'),
+            child: Text(_saving ? t('addShop.saving') : t('addShop.save')),
           ),
         ],
       ),

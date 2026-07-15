@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/locale_scope.dart';
 import '../models/business_settings.dart';
 import '../utils/currency.dart';
 
@@ -59,6 +60,7 @@ class BillReceiptCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
     final dateLabel = _formatDate(saleDate);
 
     return Container(
@@ -96,9 +98,9 @@ class BillReceiptCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                       border: Border.all(color: const Color(0xFFFDE68A)),
                     ),
-                    child: const Text(
-                      'Bill preview',
-                      style: TextStyle(
+                    child: Text(
+                      t('bill.previewBadge'),
+                      style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFFB45309),
@@ -143,7 +145,8 @@ class BillReceiptCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     [
-                      if (settings.phone.isNotEmpty) 'Tel: ${settings.phone}',
+                      if (settings.phone.isNotEmpty)
+                        t('bill.tel', {'phone': settings.phone}),
                       if (settings.email?.isNotEmpty ?? false) settings.email!,
                     ].join(' • '),
                     textAlign: TextAlign.center,
@@ -170,9 +173,12 @@ class BillReceiptCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Shop',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                Text(
+                  t('bill.shop'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
                 ),
                 Text(shopName, style: const TextStyle(fontSize: 12)),
                 if (shopOwner != null && shopOwner!.isNotEmpty)
@@ -182,9 +188,12 @@ class BillReceiptCard extends StatelessWidget {
                 if (shopPhone != null && shopPhone!.isNotEmpty)
                   Text(shopPhone!, style: const TextStyle(fontSize: 12)),
                 const SizedBox(height: 10),
-                const Text(
-                  'Delivery',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                Text(
+                  t('bill.delivery'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
                 ),
                 Text(deliveryName, style: const TextStyle(fontSize: 12)),
                 Text(dateLabel, style: const TextStyle(fontSize: 12)),
@@ -197,11 +206,11 @@ class BillReceiptCard extends StatelessWidget {
             child: Column(
               children: [
                 Row(
-                  children: const [
+                  children: [
                     Expanded(
                       child: Text(
-                        'Product',
-                        style: TextStyle(
+                        t('bill.product'),
+                        style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF57534E),
@@ -211,22 +220,22 @@ class BillReceiptCard extends StatelessWidget {
                     SizedBox(
                       width: 36,
                       child: Text(
-                        'Qty',
+                        t('bill.qty'),
                         textAlign: TextAlign.right,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF57534E),
                         ),
                       ),
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     SizedBox(
                       width: 72,
                       child: Text(
-                        'Total',
+                        t('bill.total'),
                         textAlign: TextAlign.right,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF57534E),
@@ -237,11 +246,14 @@ class BillReceiptCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 if (items.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Text(
-                      'Add products to see bill lines',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF78716C)),
+                      t('bill.addProductsHint'),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF78716C),
+                      ),
                     ),
                   )
                 else
@@ -278,21 +290,21 @@ class BillReceiptCard extends StatelessWidget {
                     ),
                   ),
                 const Divider(height: 20, color: Color(0xFFE7E5E4)),
-                _summaryRow('Today\'s drop (Rs)', formatCurrency(totalAmount)),
+                _summaryRow(t('bill.todaysDrop'), formatCurrency(totalAmount)),
                 if (previousBalance > 0)
                   _summaryRow(
-                    'Previous unpaid (Rs)',
+                    t('bill.previousUnpaid'),
                     formatCurrency(previousBalance),
                     color: const Color(0xFFB45309),
                   ),
                 _summaryRow(
-                  'Total due (Rs)',
+                  t('bill.totalDue'),
                   formatCurrency(amountDue),
                   bold: true,
                 ),
-                _summaryRow('Paid (Rs)', formatCurrency(paidAmount)),
+                _summaryRow(t('bill.paid'), formatCurrency(paidAmount)),
                 _summaryRow(
-                  'Remaining (Rs)',
+                  t('bill.remaining'),
                   formatCurrency(remaining),
                   bold: true,
                   color: const Color(0xFFB91C1C),
@@ -300,15 +312,21 @@ class BillReceiptCard extends StatelessWidget {
                 if (notes != null && notes!.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Text(
-                    'Notes: $notes',
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF57534E)),
+                    t('bill.notes', {'notes': notes}),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF57534E),
+                    ),
                   ),
                 ],
                 const SizedBox(height: 12),
-                const Text(
-                  'Thank you for your business',
+                Text(
+                  t('bill.thankYou'),
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 10, color: Color(0xFF78716C)),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF78716C),
+                  ),
                 ),
               ],
             ),

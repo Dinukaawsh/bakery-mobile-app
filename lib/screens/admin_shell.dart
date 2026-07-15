@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/locale_scope.dart';
 import '../models/admin_models.dart';
 import '../models/allocation.dart';
 import '../models/business_settings.dart';
@@ -12,6 +13,7 @@ import '../utils/currency.dart';
 import '../utils/dates.dart';
 import '../widgets/bill_modal.dart';
 import '../widgets/confirm_dialog.dart';
+import '../widgets/locale_toggle.dart';
 import 'account_settings_screen.dart';
 
 class AdminShell extends StatefulWidget {
@@ -40,13 +42,13 @@ class _AdminShellState extends State<AdminShell> {
   late BusinessSettings _businessSettings;
 
   static const _sections = [
-    _AdminSection(0, 'Dashboard', Icons.dashboard_outlined),
-    _AdminSection(1, 'Products', Icons.inventory_2_outlined),
-    _AdminSection(2, 'Sales', Icons.payments_outlined),
-    _AdminSection(3, 'Delivery Partners', Icons.local_shipping_outlined),
-    _AdminSection(4, 'Stock Assignments', Icons.assignment_outlined),
-    _AdminSection(5, 'Shops', Icons.storefront_outlined),
-    _AdminSection(6, 'Settings', Icons.settings_outlined),
+    _AdminSection(0, 'nav.dashboard', Icons.dashboard_outlined),
+    _AdminSection(1, 'nav.products', Icons.inventory_2_outlined),
+    _AdminSection(2, 'nav.sales', Icons.payments_outlined),
+    _AdminSection(3, 'nav.partners', Icons.local_shipping_outlined),
+    _AdminSection(4, 'nav.assignments', Icons.assignment_outlined),
+    _AdminSection(5, 'nav.shops', Icons.storefront_outlined),
+    _AdminSection(6, 'nav.settings', Icons.settings_outlined),
   ];
 
   @override
@@ -64,12 +66,13 @@ class _AdminShellState extends State<AdminShell> {
   }
 
   Future<void> _confirmLogout() async {
+    final t = LocaleScope.of(context).t;
     final shouldLogout = await showConfirmDialog(
       context,
-      title: 'Sign out?',
-      message: 'Are you sure you want to logout from the admin panel?',
-      confirmLabel: 'Sign out',
-      cancelLabel: 'Cancel',
+      title: t('admin.logoutConfirmTitle'),
+      message: t('admin.logoutConfirmMessage'),
+      confirmLabel: t('common.logout'),
+      cancelLabel: t('common.cancel'),
       isDanger: true,
     );
     if (shouldLogout) widget.onLogout();
@@ -107,6 +110,7 @@ class _AdminShellState extends State<AdminShell> {
 
   @override
   Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
     final current = _sections[_section];
 
     return Scaffold(
@@ -120,7 +124,7 @@ class _AdminShellState extends State<AdminShell> {
               _businessSettings.businessName,
               style: const TextStyle(fontSize: 12),
             ),
-            Text(current.label),
+            Text(t(current.labelKey)),
           ],
         ),
         backgroundColor: const Color(0xFFB45309),
@@ -130,7 +134,9 @@ class _AdminShellState extends State<AdminShell> {
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
         actions: [
+          const LocaleToggle(),
           IconButton(
+            tooltip: t('common.logout'),
             onPressed: _confirmLogout,
             icon: const Icon(Icons.logout),
           ),
@@ -147,9 +153,9 @@ class _AdminShellState extends State<AdminShell> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    const Text(
-                      'Admin Panel',
-                      style: TextStyle(
+                    Text(
+                      t('admin.adminPanel'),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -175,7 +181,7 @@ class _AdminShellState extends State<AdminShell> {
                           ? const Color(0xFFB45309)
                           : const Color(0xFF78716C),
                     ),
-                    title: Text(section.label),
+                    title: Text(t(section.labelKey)),
                     selected: selected,
                     selectedTileColor: const Color(0xFFFEF3C7),
                     onTap: () {
@@ -195,10 +201,10 @@ class _AdminShellState extends State<AdminShell> {
 }
 
 class _AdminSection {
-  const _AdminSection(this.index, this.label, this.icon);
+  const _AdminSection(this.index, this.labelKey, this.icon);
 
   final int index;
-  final String label;
+  final String labelKey;
   final IconData icon;
 }
 
@@ -237,8 +243,12 @@ class _AdminDashboardPageState extends State<_AdminDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+
     if (_error != null) {
-      return Center(child: Text(_error!, style: const TextStyle(color: Colors.red)));
+      return Center(
+        child: Text(_error!, style: const TextStyle(color: Colors.red)),
+      );
     }
     if (_stats == null) {
       return const Center(child: CircularProgressIndicator());
@@ -251,27 +261,30 @@ class _AdminDashboardPageState extends State<_AdminDashboardPage> {
         padding: const EdgeInsets.all(16),
         children: [
           _StatCard(
-            title: 'Sales total (period)',
+            title: t('admin.salesTotalPeriod'),
             value: formatCurrencyFromString(stats.periodSalesTotal),
-            subtitle: '${stats.periodSalesCount} deliveries',
+            subtitle: t(
+              'admin.deliveriesCount',
+              {'count': stats.periodSalesCount},
+            ),
             icon: Icons.payments_outlined,
           ),
           _StatCard(
-            title: 'Products',
+            title: t('admin.products'),
             value: '${stats.totalProducts}',
-            subtitle: 'Active bakery products',
+            subtitle: t('admin.activeProducts'),
             icon: Icons.inventory_2_outlined,
           ),
           _StatCard(
-            title: 'Delivery partners',
+            title: t('admin.partners'),
             value: '${stats.totalDeliveryGuys}',
-            subtitle: 'Registered partners',
+            subtitle: t('admin.registeredPartners'),
             icon: Icons.local_shipping_outlined,
           ),
           _StatCard(
-            title: 'Shops',
+            title: t('admin.shops'),
             value: '${stats.totalShops}',
-            subtitle: 'Registered shops',
+            subtitle: t('admin.registeredShops'),
             icon: Icons.storefront_outlined,
           ),
         ],
@@ -399,8 +412,12 @@ class _AdminProductsPageState extends State<_AdminProductsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+
     if (_error != null) {
-      return Center(child: Text(_error!, style: const TextStyle(color: Colors.red)));
+      return Center(
+        child: Text(_error!, style: const TextStyle(color: Colors.red)),
+      );
     }
 
     final activeCount = _products.where((p) => p.isActive).length;
@@ -416,11 +433,15 @@ class _AdminProductsPageState extends State<_AdminProductsPage> {
                 segments: [
                   ButtonSegment(
                     value: true,
-                    label: Text('Active ($activeCount)'),
+                    label: Text(
+                      t('admin.activeCount', {'count': activeCount}),
+                    ),
                   ),
                   ButtonSegment(
                     value: false,
-                    label: Text('Inactive ($inactiveCount)'),
+                    label: Text(
+                      t('admin.inactiveCount', {'count': inactiveCount}),
+                    ),
                   ),
                 ],
                 selected: {_showActive},
@@ -434,15 +455,15 @@ class _AdminProductsPageState extends State<_AdminProductsPage> {
                   Expanded(
                     child: DropdownButtonFormField<String?>(
                       value: _categoryFilter,
-                      decoration: const InputDecoration(
-                        labelText: 'Category',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: t('admin.category'),
+                        border: const OutlineInputBorder(),
                         isDense: true,
                       ),
                       items: [
-                        const DropdownMenuItem<String?>(
+                        DropdownMenuItem<String?>(
                           value: null,
-                          child: Text('All'),
+                          child: Text(t('common.all')),
                         ),
                         ..._categories.map(
                           (category) => DropdownMenuItem<String?>(
@@ -459,22 +480,28 @@ class _AdminProductsPageState extends State<_AdminProductsPage> {
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       value: _sortBy,
-                      decoration: const InputDecoration(
-                        labelText: 'Sort',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: t('admin.sort'),
+                        border: const OutlineInputBorder(),
                         isDense: true,
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 'name', child: Text('Name')),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'name',
+                          child: Text(t('common.name')),
+                        ),
                         DropdownMenuItem(
                           value: 'priceAsc',
-                          child: Text('Price ↑'),
+                          child: Text(t('admin.priceAsc')),
                         ),
                         DropdownMenuItem(
                           value: 'priceDesc',
-                          child: Text('Price ↓'),
+                          child: Text(t('admin.priceDesc')),
                         ),
-                        DropdownMenuItem(value: 'stock', child: Text('Stock')),
+                        DropdownMenuItem(
+                          value: 'stock',
+                          child: Text(t('admin.stock')),
+                        ),
                       ],
                       onChanged: (value) {
                         if (value != null) setState(() => _sortBy = value);
@@ -496,8 +523,8 @@ class _AdminProductsPageState extends State<_AdminProductsPage> {
                       Center(
                         child: Text(
                           _showActive
-                              ? 'No active products'
-                              : 'No inactive products',
+                              ? t('admin.noActiveProducts')
+                              : t('admin.noInactiveProducts'),
                         ),
                       ),
                     ],
@@ -514,9 +541,16 @@ class _AdminProductsPageState extends State<_AdminProductsPage> {
                         child: ListTile(
                           title: Text(product.name),
                           subtitle: Text(
-                            '${product.category} • Stock: ${product.stockAvailable}',
+                            t(
+                              'admin.categoryStock',
+                              {
+                                'category': product.category,
+                                'count': product.stockAvailable,
+                              },
+                            ),
                           ),
-                          trailing: Text(formatCurrencyFromString(product.price)),
+                          trailing:
+                              Text(formatCurrencyFromString(product.price)),
                         ),
                       );
                     },
@@ -567,8 +601,7 @@ class _AdminSalesPageState extends State<_AdminSalesPage> {
     try {
       final sales = await widget.apiService.fetchSales(
         today: _todayOnly,
-        deliveryGuyId:
-            _partnerId == null ? null : int.tryParse(_partnerId!),
+        deliveryGuyId: _partnerId == null ? null : int.tryParse(_partnerId!),
       );
       if (!mounted) return;
       setState(() {
@@ -583,6 +616,8 @@ class _AdminSalesPageState extends State<_AdminSalesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+
     return Column(
       children: [
         Padding(
@@ -593,7 +628,7 @@ class _AdminSalesPageState extends State<_AdminSalesPage> {
                 children: [
                   Expanded(
                     child: FilterChip(
-                      label: const Text('Today only'),
+                      label: Text(t('admin.todayOnly')),
                       selected: _todayOnly,
                       onSelected: (value) {
                         setState(() => _todayOnly = value);
@@ -601,20 +636,24 @@ class _AdminSalesPageState extends State<_AdminSalesPage> {
                       },
                     ),
                   ),
-                  IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
+                  IconButton(
+                    tooltip: t('common.refresh'),
+                    onPressed: _load,
+                    icon: const Icon(Icons.refresh),
+                  ),
                 ],
               ),
               DropdownButtonFormField<String?>(
                 value: _partnerId,
-                decoration: const InputDecoration(
-                  labelText: 'Delivery partner',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: t('admin.deliveryPartner'),
+                  border: const OutlineInputBorder(),
                   isDense: true,
                 ),
                 items: [
-                  const DropdownMenuItem<String?>(
+                  DropdownMenuItem<String?>(
                     value: null,
-                    child: Text('All partners'),
+                    child: Text(t('admin.allPartners')),
                   ),
                   ..._partners.map(
                     (partner) => DropdownMenuItem<String?>(
@@ -641,9 +680,9 @@ class _AdminSalesPageState extends State<_AdminSalesPage> {
             onRefresh: _load,
             child: _sales.isEmpty
                 ? ListView(
-                    children: const [
-                      SizedBox(height: 120),
-                      Center(child: Text('No sales found')),
+                    children: [
+                      const SizedBox(height: 120),
+                      Center(child: Text(t('admin.noSalesFound'))),
                     ],
                   )
                 : ListView.builder(
@@ -666,10 +705,14 @@ class _AdminSalesPageState extends State<_AdminSalesPage> {
                             children: [
                               Text(
                                 formatCurrencyFromString(sale.totalAmount),
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                               Text(
-                                sale.billPrinted ? 'Bill printed' : 'View bill',
+                                sale.billPrinted
+                                    ? t('admin.billPrinted')
+                                    : t('admin.viewBill'),
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: sale.billPrinted
@@ -733,17 +776,21 @@ class _AdminPartnersPageState extends State<_AdminPartnersPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+
     if (_error != null) {
-      return Center(child: Text(_error!, style: const TextStyle(color: Colors.red)));
+      return Center(
+        child: Text(_error!, style: const TextStyle(color: Colors.red)),
+      );
     }
 
     return RefreshIndicator(
       onRefresh: _load,
       child: _partners.isEmpty
           ? ListView(
-              children: const [
-                SizedBox(height: 120),
-                Center(child: Text('No delivery partners yet')),
+              children: [
+                const SizedBox(height: 120),
+                Center(child: Text(t('admin.noPartnersYet'))),
               ],
             )
           : ListView.builder(
@@ -751,7 +798,8 @@ class _AdminPartnersPageState extends State<_AdminPartnersPage> {
               itemBuilder: (context, index) {
                 final partner = _partners[index];
                 return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   child: ListTile(
                     title: Text(partner.name),
                     subtitle: Text(partner.email),
@@ -825,9 +873,10 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
   }
 
   Future<void> _submitAssignment() async {
+    final t = LocaleScope.of(context).t;
     final partnerId = int.tryParse(_assignPartnerId ?? '');
     if (partnerId == null) {
-      setState(() => _error = 'Select a delivery partner');
+      setState(() => _error = t('admin.selectPartner'));
       return;
     }
 
@@ -837,7 +886,7 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
         .toList();
 
     if (items.isEmpty) {
-      setState(() => _error = 'Add at least one product quantity');
+      setState(() => _error = t('admin.addProductQty'));
       return;
     }
 
@@ -871,6 +920,8 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+
     return Stack(
       children: [
         Column(
@@ -881,9 +932,9 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
                 children: [
                   TextFormField(
                     initialValue: _date,
-                    decoration: const InputDecoration(
-                      labelText: 'Assignment date (YYYY-MM-DD)',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: t('admin.assignmentDate'),
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                     onFieldSubmitted: (value) {
@@ -894,15 +945,15 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String?>(
                     value: _partnerFilter,
-                    decoration: const InputDecoration(
-                      labelText: 'Filter by partner',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: t('admin.filterByPartner'),
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                     items: [
-                      const DropdownMenuItem<String?>(
+                      DropdownMenuItem<String?>(
                         value: null,
-                        child: Text('All partners'),
+                        child: Text(t('admin.allPartners')),
                       ),
                       ..._partners.map(
                         (partner) => DropdownMenuItem<String?>(
@@ -929,9 +980,9 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
                 onRefresh: _load,
                 child: _summary.isEmpty
                     ? ListView(
-                        children: const [
-                          SizedBox(height: 120),
-                          Center(child: Text('No stock assignments for this date')),
+                        children: [
+                          const SizedBox(height: 120),
+                          Center(child: Text(t('admin.noAssignments'))),
                         ],
                       )
                     : ListView.builder(
@@ -950,8 +1001,18 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Text('Given ${row.allocated}'),
-                                  Text('Left ${row.remaining}'),
+                                  Text(
+                                    t(
+                                      'admin.given',
+                                      {'count': row.allocated},
+                                    ),
+                                  ),
+                                  Text(
+                                    t(
+                                      'admin.left',
+                                      {'count': row.remaining},
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -970,7 +1031,7 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
             backgroundColor: const Color(0xFFB45309),
             foregroundColor: Colors.white,
             icon: const Icon(Icons.add),
-            label: const Text('Assign stock'),
+            label: Text(t('admin.assignStock')),
           ),
         ),
         if (_assignOpen)
@@ -990,15 +1051,15 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Text(
-                              'Assign stock',
+                              t('admin.assignStock'),
                               style: Theme.of(context).textTheme.titleLarge,
                             ),
                             const SizedBox(height: 12),
                             DropdownButtonFormField<String?>(
                               value: _assignPartnerId,
-                              decoration: const InputDecoration(
-                                labelText: 'Delivery partner',
-                                border: OutlineInputBorder(),
+                              decoration: InputDecoration(
+                                labelText: t('admin.deliveryPartner'),
+                                border: const OutlineInputBorder(),
                               ),
                               items: _partners
                                   .map(
@@ -1018,7 +1079,10 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
                                 contentPadding: EdgeInsets.zero,
                                 title: Text(product.name),
                                 subtitle: Text(
-                                  'Stock ${product.stockAvailable}',
+                                  t(
+                                    'admin.stockAvailable',
+                                    {'count': product.stockAvailable},
+                                  ),
                                 ),
                                 trailing: SizedBox(
                                   width: 120,
@@ -1061,18 +1125,22 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
                                               _assignPartnerId = null;
                                               _assignQty.clear();
                                             }),
-                                    child: const Text('Cancel'),
+                                    child: Text(t('common.cancel')),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: FilledButton(
-                                    onPressed: _saving ? null : _submitAssignment,
+                                    onPressed:
+                                        _saving ? null : _submitAssignment,
                                     style: FilledButton.styleFrom(
-                                      backgroundColor: const Color(0xFFB45309),
+                                      backgroundColor:
+                                          const Color(0xFFB45309),
                                     ),
                                     child: Text(
-                                      _saving ? 'Saving...' : 'Assign',
+                                      _saving
+                                          ? t('common.saving')
+                                          : t('admin.assign'),
                                     ),
                                   ),
                                 ),
@@ -1149,8 +1217,12 @@ class _AdminShopsPageState extends State<_AdminShopsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+
     if (_error != null) {
-      return Center(child: Text(_error!, style: const TextStyle(color: Colors.red)));
+      return Center(
+        child: Text(_error!, style: const TextStyle(color: Colors.red)),
+      );
     }
 
     final activeCount = _shops.where((s) => s.isActive).length;
@@ -1166,11 +1238,15 @@ class _AdminShopsPageState extends State<_AdminShopsPage> {
                 segments: [
                   ButtonSegment(
                     value: true,
-                    label: Text('Active ($activeCount)'),
+                    label: Text(
+                      t('admin.activeCount', {'count': activeCount}),
+                    ),
                   ),
                   ButtonSegment(
                     value: false,
-                    label: Text('Inactive ($inactiveCount)'),
+                    label: Text(
+                      t('admin.inactiveCount', {'count': inactiveCount}),
+                    ),
                   ),
                 ],
                 selected: {_showActive},
@@ -1182,15 +1258,15 @@ class _AdminShopsPageState extends State<_AdminShopsPage> {
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String?>(
                   value: _routeFilter,
-                  decoration: const InputDecoration(
-                    labelText: 'Filter by route',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: t('admin.filterByRoute'),
+                    border: const OutlineInputBorder(),
                     isDense: true,
                   ),
                   items: [
-                    const DropdownMenuItem<String?>(
+                    DropdownMenuItem<String?>(
                       value: null,
-                      child: Text('All routes'),
+                      child: Text(t('admin.allRoutes')),
                     ),
                     ..._routes.map(
                       (route) => DropdownMenuItem<String?>(
@@ -1214,7 +1290,9 @@ class _AdminShopsPageState extends State<_AdminShopsPage> {
                       const SizedBox(height: 120),
                       Center(
                         child: Text(
-                          _showActive ? 'No active shops' : 'No inactive shops',
+                          _showActive
+                              ? t('admin.noActiveShops')
+                              : t('admin.noInactiveShops'),
                         ),
                       ),
                     ],
@@ -1233,9 +1311,15 @@ class _AdminShopsPageState extends State<_AdminShopsPage> {
                           subtitle: Text(
                             [
                               if (shop.route != null && shop.route!.isNotEmpty)
-                                'Route: ${shop.route}',
+                                t(
+                                  'admin.routeLabel',
+                                  {'route': shop.route},
+                                ),
                               if (shop.outstandingAsDouble > 0)
-                                'Owes Rs ${shop.outstandingBalance}',
+                                t(
+                                  'admin.owesRs',
+                                  {'amount': shop.outstandingBalance},
+                                ),
                               if (shop.ownerName.isNotEmpty) shop.ownerName,
                               if (shop.address.isNotEmpty) shop.address,
                               if (shop.phone != null && shop.phone!.isNotEmpty)
@@ -1271,6 +1355,8 @@ class _AdminSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -1281,12 +1367,14 @@ class _AdminSettingsPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Business',
+                  t('admin.business'),
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
-                Text(businessSettings.businessName,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  businessSettings.businessName,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
                 if (businessSettings.address.isNotEmpty)
                   Text(businessSettings.address),
                 if (businessSettings.phone.isNotEmpty)
@@ -1301,7 +1389,7 @@ class _AdminSettingsPage extends StatelessWidget {
         Card(
           child: ListTile(
             leading: const Icon(Icons.person_outline),
-            title: const Text('Account settings'),
+            title: Text(t('admin.accountSettings')),
             subtitle: Text(user.email),
             trailing: const Icon(Icons.chevron_right),
             onTap: () async {
@@ -1321,12 +1409,12 @@ class _AdminSettingsPage extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        const Card(
+        Card(
           child: Padding(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             child: Text(
-              'For full business settings, product editing, and partner management, use the web admin panel.',
-              style: TextStyle(color: Color(0xFF78716C)),
+              t('admin.webPanelHint'),
+              style: const TextStyle(color: Color(0xFF78716C)),
             ),
           ),
         ),

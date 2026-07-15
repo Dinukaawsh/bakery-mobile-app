@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -5,6 +6,11 @@ import 'package:printing/printing.dart';
 import '../models/business_settings.dart';
 import '../utils/currency.dart';
 import '../widgets/bill_receipt_card.dart';
+
+typedef BillTranslate = String Function(
+  String key, [
+  Map<String, Object?>? params,
+]);
 
 Future<void> printBillReceipt({
   required BusinessSettings settings,
@@ -14,6 +20,7 @@ Future<void> printBillReceipt({
   required DateTime saleDate,
   required List<BillLineItem> items,
   required double totalAmount,
+  required BillTranslate t,
   double previousBalance = 0,
   double paidAmount = 0,
   double? remainingAfter,
@@ -22,6 +29,27 @@ Future<void> printBillReceipt({
   String? shopPhone,
   String? notes,
 }) async {
+  final fontData = await rootBundle.load(
+    'assets/fonts/NotoSansSinhala-Regular.ttf',
+  );
+  final fontBoldData = await rootBundle.load(
+    'assets/fonts/NotoSansSinhala-Bold.ttf',
+  );
+  final font = pw.Font.ttf(fontData);
+  final fontBold = pw.Font.ttf(fontBoldData);
+
+  pw.TextStyle baseStyle({
+    double fontSize = 10,
+    bool bold = false,
+  }) {
+    return pw.TextStyle(
+      font: bold ? fontBold : font,
+      fontFallback: [font],
+      fontSize: fontSize,
+      fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+    );
+  }
+
   final doc = pw.Document();
   final dateLabel = _formatDate(saleDate);
   final amountDue = previousBalance + totalAmount;
@@ -31,7 +59,8 @@ Future<void> printBillReceipt({
   doc.addPage(
     pw.Page(
       pageFormat: PdfPageFormat.roll80,
-      margin: const pw.EdgeInsets.all(16),
+      margin: const pw.EdgeInsets.all(12),
+      theme: pw.ThemeData.withFont(base: font, bold: fontBold),
       build: (context) {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -39,66 +68,66 @@ Future<void> printBillReceipt({
             pw.Center(
               child: pw.Text(
                 settings.businessName,
-                style: pw.TextStyle(
-                  fontSize: 16,
-                  fontWeight: pw.FontWeight.bold,
-                ),
+                style: baseStyle(fontSize: 14, bold: true),
+                textAlign: pw.TextAlign.center,
               ),
             ),
             if (settings.ownerName != null && settings.ownerName!.isNotEmpty)
               pw.Center(
                 child: pw.Text(
                   settings.ownerName!,
-                  style: const pw.TextStyle(fontSize: 10),
+                  style: baseStyle(fontSize: 9),
+                  textAlign: pw.TextAlign.center,
                 ),
               ),
             if (settings.address.isNotEmpty)
               pw.Center(
                 child: pw.Text(
                   settings.address,
-                  style: const pw.TextStyle(fontSize: 10),
+                  style: baseStyle(fontSize: 9),
                   textAlign: pw.TextAlign.center,
                 ),
               ),
             if (settings.phone.isNotEmpty)
               pw.Center(
                 child: pw.Text(
-                  'Tel: ${settings.phone}',
-                  style: const pw.TextStyle(fontSize: 10),
+                  t('bill.tel', {'phone': settings.phone}),
+                  style: baseStyle(fontSize: 9),
                 ),
               ),
-            pw.SizedBox(height: 8),
+            pw.SizedBox(height: 6),
             pw.Center(
               child: pw.Text(
                 billNumberLabel,
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                style: baseStyle(bold: true),
               ),
             ),
             pw.Divider(),
-            pw.Text('Shop', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-            pw.Text(shopName),
-            if (shopOwner != null && shopOwner.isNotEmpty) pw.Text(shopOwner),
+            pw.Text(t('bill.shop'), style: baseStyle(bold: true)),
+            pw.Text(shopName, style: baseStyle()),
+            if (shopOwner != null && shopOwner.isNotEmpty)
+              pw.Text(shopOwner, style: baseStyle()),
             if (shopAddress != null && shopAddress.isNotEmpty)
-              pw.Text(shopAddress),
-            if (shopPhone != null && shopPhone.isNotEmpty) pw.Text(shopPhone),
-            pw.SizedBox(height: 8),
-            pw.Text(
-              'Delivery',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-            ),
-            pw.Text(deliveryName),
-            pw.Text(dateLabel),
-            pw.SizedBox(height: 8),
+              pw.Text(shopAddress, style: baseStyle()),
+            if (shopPhone != null && shopPhone.isNotEmpty)
+              pw.Text(shopPhone, style: baseStyle()),
+            pw.SizedBox(height: 6),
+            pw.Text(t('bill.delivery'), style: baseStyle(bold: true)),
+            pw.Text(deliveryName, style: baseStyle()),
+            pw.Text(dateLabel, style: baseStyle()),
+            pw.SizedBox(height: 6),
             pw.Divider(),
             for (final item in items)
               pw.Padding(
                 padding: const pw.EdgeInsets.symmetric(vertical: 2),
                 child: pw.Row(
                   children: [
-                    pw.Expanded(child: pw.Text(item.productName)),
-                    pw.Text('${item.quantity}'),
+                    pw.Expanded(
+                      child: pw.Text(item.productName, style: baseStyle()),
+                    ),
+                    pw.Text('${item.quantity}', style: baseStyle()),
                     pw.SizedBox(width: 8),
-                    pw.Text(formatCurrency(item.lineTotal)),
+                    pw.Text(formatCurrency(item.lineTotal), style: baseStyle()),
                   ],
                 ),
               ),
@@ -106,60 +135,58 @@ Future<void> printBillReceipt({
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text("Today's drop (Rs)"),
-                pw.Text(formatCurrency(totalAmount)),
+                pw.Text(t('bill.todaysDrop'), style: baseStyle()),
+                pw.Text(formatCurrency(totalAmount), style: baseStyle()),
               ],
             ),
             if (previousBalance > 0)
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Previous unpaid (Rs)'),
-                  pw.Text(formatCurrency(previousBalance)),
+                  pw.Text(t('bill.previousUnpaid'), style: baseStyle()),
+                  pw.Text(formatCurrency(previousBalance), style: baseStyle()),
                 ],
               ),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text(
-                  'Total due (Rs)',
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                ),
+                pw.Text(t('bill.totalDue'), style: baseStyle(bold: true)),
                 pw.Text(
                   formatCurrency(amountDue),
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  style: baseStyle(bold: true),
                 ),
               ],
             ),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text('Paid (Rs)'),
-                pw.Text(formatCurrency(paidAmount)),
+                pw.Text(t('bill.paid'), style: baseStyle()),
+                pw.Text(formatCurrency(paidAmount), style: baseStyle()),
               ],
             ),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text(
-                  'Remaining (Rs)',
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                ),
+                pw.Text(t('bill.remaining'), style: baseStyle(bold: true)),
                 pw.Text(
                   formatCurrency(remaining),
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  style: baseStyle(bold: true),
                 ),
               ],
             ),
             if (notes != null && notes.isNotEmpty) ...[
-              pw.SizedBox(height: 8),
-              pw.Text('Notes: $notes'),
+              pw.SizedBox(height: 6),
+              pw.Text(
+                t('bill.notes', {'notes': notes}),
+                style: baseStyle(),
+              ),
             ],
-            pw.SizedBox(height: 12),
+            pw.SizedBox(height: 10),
             pw.Center(
               child: pw.Text(
-                'Thank you for your business',
-                style: const pw.TextStyle(fontSize: 9),
+                t('bill.thankYou'),
+                style: baseStyle(fontSize: 8),
+                textAlign: pw.TextAlign.center,
               ),
             ),
           ],
