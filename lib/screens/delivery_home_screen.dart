@@ -790,6 +790,19 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
+                    if (widget.user.imageUrl != null &&
+                        widget.user.imageUrl!.trim().isNotEmpty) ...[
+                      ClipOval(
+                        child: Image.network(
+                          widget.user.imageUrl!.trim(),
+                          width: 56,
+                          height: 56,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     Text(
                       t('delivery.deliveryPanel'),
                       style: const TextStyle(
@@ -825,21 +838,15 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
               child: Column(
                 children: [
                   ListTile(
-                    leading: CircleAvatar(
-                      radius: 18,
-                      backgroundColor: const Color(0xFFFEF3C7),
-                      backgroundImage: widget.user.imageUrl != null &&
-                              widget.user.imageUrl!.trim().isNotEmpty
-                          ? NetworkImage(widget.user.imageUrl!.trim())
-                          : null,
-                      child: widget.user.imageUrl == null ||
-                              widget.user.imageUrl!.trim().isEmpty
-                          ? const Icon(
-                              Icons.person_outline,
-                              color: Color(0xFFB45309),
-                            )
-                          : null,
-                    ),
+                    leading: widget.user.imageUrl != null &&
+                            widget.user.imageUrl!.trim().isNotEmpty
+                        ? CircleAvatar(
+                            radius: 18,
+                            backgroundImage: NetworkImage(
+                              widget.user.imageUrl!.trim(),
+                            ),
+                          )
+                        : const Icon(Icons.person_outline),
                     title: Text(t('delivery.accountSettings')),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

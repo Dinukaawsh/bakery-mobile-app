@@ -186,6 +186,19 @@ class _AdminShellState extends State<AdminShell> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
+                    if (widget.user.imageUrl != null &&
+                        widget.user.imageUrl!.trim().isNotEmpty) ...[
+                      ClipOval(
+                        child: Image.network(
+                          widget.user.imageUrl!.trim(),
+                          width: 56,
+                          height: 56,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     Text(
                       t('admin.adminPanel'),
                       style: const TextStyle(
