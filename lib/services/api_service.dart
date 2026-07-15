@@ -13,6 +13,7 @@ import '../models/sale.dart';
 import '../models/shop.dart';
 import '../models/shop_drop.dart';
 import '../models/user.dart';
+import '../models/notification.dart';
 import '../utils/dates.dart';
 
 class ApiService {
@@ -90,12 +91,12 @@ class ApiService {
       headers: _headers(),
     );
     final data = await _decode(response);
-    final user = AppUser.fromJson(data['user'] as Map<String, dynamic>);
-    return user.copyWith(
-      phone: data['phone'] as String?,
-      imageUrl: data['imageUrl'] as String?,
-      clearImageUrl: data['imageUrl'] == null,
+    final userMap = Map<String, dynamic>.from(
+      data['user'] as Map<String, dynamic>,
     );
+    userMap['phone'] ??= data['phone'];
+    userMap['imageUrl'] ??= data['imageUrl'];
+    return AppUser.fromJson(userMap);
   }
 
   Future<({AppUser user, String? phone, String? imageUrl})> getProfile() async {
@@ -199,12 +200,12 @@ class ApiService {
     final data = await _decode(response);
     final token = data['token'] as String;
     await saveToken(token);
-    final user = AppUser.fromJson(data['user'] as Map<String, dynamic>);
-    return user.copyWith(
-      phone: data['phone'] as String?,
-      imageUrl: data['imageUrl'] as String?,
-      clearImageUrl: data['imageUrl'] == null,
+    final userMap = Map<String, dynamic>.from(
+      data['user'] as Map<String, dynamic>,
     );
+    userMap['phone'] ??= data['phone'];
+    userMap['imageUrl'] ??= data['imageUrl'];
+    return AppUser.fromJson(userMap);
   }
 
   Future<List<AllocationSummary>> fetchMyAllocations({String? date}) async {
@@ -414,6 +415,36 @@ class ApiService {
         'deliveryGuyId': deliveryGuyId,
         'allocationDate': allocationDate,
         'items': items,
+      }),
+    );
+    await _decode(response);
+  }
+
+  Future<NotificationsPageResult> fetchNotifications({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/api/notifications').replace(
+      queryParameters: {
+        'page': page.toString(),
+        'limit': limit.toString(),
+      },
+    );
+    final response = await _client.get(uri, headers: _headers());
+    final data = await _decode(response);
+    return NotificationsPageResult.fromJson(data);
+  }
+
+  Future<void> markNotificationsRead({
+    bool all = false,
+    List<int>? ids,
+  }) async {
+    final response = await _client.patch(
+      Uri.parse('$_baseUrl/api/notifications'),
+      headers: _headers(),
+      body: jsonEncode({
+        if (all) 'all': true,
+        if (ids != null) 'ids': ids,
       }),
     );
     await _decode(response);

@@ -35,13 +35,14 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   bool _uploadingPhoto = false;
   late String _originalEmail;
   String? _imageUrl;
-  bool _clearImage = false;
+  late AppUser _latestUser;
 
   @override
   void initState() {
     super.initState();
     _originalEmail = widget.user.email;
     _imageUrl = widget.user.imageUrl;
+    _latestUser = widget.user;
     _nameController = TextEditingController(text: widget.user.name);
     _emailController = TextEditingController(text: widget.user.email);
     _phoneController = TextEditingController(text: widget.user.phone ?? '');
@@ -54,11 +55,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       if (!mounted) return;
       setState(() {
         _phoneController.text = me.phone ?? '';
-        _imageUrl = me.imageUrl;
-        _clearImage = false;
+        _imageUrl = me.imageUrl ?? me.user.imageUrl;
         _nameController.text = me.user.name;
         _emailController.text = me.user.email;
         _originalEmail = me.user.email;
+        _latestUser = me.user;
       });
     } catch (_) {
       // Optional fields; ignore load errors here.
@@ -76,7 +77,25 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     super.dispose();
   }
 
+  Future<AppUser> _persistPhoto({
+    String? imageUrl,
+    bool clearImageUrl = false,
+  }) {
+    return widget.apiService.updateProfile(
+      name: _nameController.text.trim().isNotEmpty
+          ? _nameController.text.trim()
+          : widget.user.name,
+      phone: _phoneController.text.trim(),
+      email: _emailController.text.trim().isNotEmpty
+          ? _emailController.text.trim()
+          : widget.user.email,
+      imageUrl: clearImageUrl ? null : imageUrl,
+      clearImageUrl: clearImageUrl,
+    );
+  }
+
   Future<void> _pickPhoto() async {
+    final t = LocaleScope.of(context).t;
     try {
       final picker = ImagePicker();
       final file = await picker.pickImage(
@@ -97,12 +116,44 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         bytes: bytes,
         filename: file.name.isNotEmpty ? file.name : 'profile.jpg',
       );
+
+      // Save to DB immediately so refresh keeps the photo.
+      final updated = await _persistPhoto(imageUrl: url);
+
       if (!mounted) return;
       setState(() {
-        _imageUrl = url;
-        _clearImage = false;
+        _imageUrl = updated.imageUrl ?? url;
+        _latestUser = updated;
         _uploadingPhoto = false;
       });
+      showSuccessToast(context, t('account.photoSaved'));
+    } on AccountSuspendedException {
+      // AuthGate handles suspended banner.
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _uploadingPhoto = false;
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+      showErrorToast(context, _error!);
+    }
+  }
+
+  Future<void> _removePhoto() async {
+    final t = LocaleScope.of(context).t;
+    setState(() {
+      _uploadingPhoto = true;
+      _error = null;
+    });
+    try {
+      final updated = await _persistPhoto(clearImageUrl: true);
+      if (!mounted) return;
+      setState(() {
+        _imageUrl = null;
+        _latestUser = updated;
+        _uploadingPhoto = false;
+      });
+      showSuccessToast(context, t('account.photoRemoved'));
     } on AccountSuspendedException {
       // AuthGate handles suspended banner.
     } catch (error) {
@@ -146,8 +197,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
         password: newPassword.isNotEmpty ? newPassword : null,
-        imageUrl: _clearImage ? null : _imageUrl,
-        clearImageUrl: _clearImage,
+        imageUrl: _imageUrl,
       );
 
       if (!mounted) return;
@@ -166,135 +216,145 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     }
   }
 
+  void _popWithLatest() {
+    Navigator.of(context).pop(_latestUser);
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = LocaleScope.of(context).t;
-    final hasImage = !_clearImage &&
-        _imageUrl != null &&
-        _imageUrl!.trim().isNotEmpty;
+    final hasImage = _imageUrl != null && _imageUrl!.trim().isNotEmpty;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFFFFBEB),
-      appBar: bakeryAppBar(context, title: t('account.title')),
-      body: ListView(
-        padding: listPaddingWithSystemBottom(context, bottomBase: 24),
-        children: [
-          Center(
-            child: Column(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(48),
-                  child: Container(
-                    width: 96,
-                    height: 96,
-                    color: const Color(0xFFFFEDD5),
-                    child: hasImage
-                        ? Image.network(
-                            _imageUrl!.trim(),
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _popWithLatest();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFFFFBEB),
+        appBar: bakeryAppBar(
+          context,
+          title: t('account.title'),
+          onBack: _popWithLatest,
+        ),
+        body: ListView(
+          padding: listPaddingWithSystemBottom(context, bottomBase: 24),
+          children: [
+            Center(
+              child: Column(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(48),
+                    child: Container(
+                      width: 96,
+                      height: 96,
+                      color: const Color(0xFFFFEDD5),
+                      child: hasImage
+                          ? Image.network(
+                              _imageUrl!.trim(),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.person,
+                                size: 48,
+                                color: Color(0xFFB45309),
+                              ),
+                            )
+                          : const Icon(
                               Icons.person,
                               size: 48,
                               color: Color(0xFFB45309),
                             ),
-                          )
-                        : const Icon(
-                            Icons.person,
-                            size: 48,
-                            color: Color(0xFFB45309),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (_uploadingPhoto)
-                  const BakeryLoadingCenter()
-                else ...[
-                  OutlinedButton.icon(
-                    onPressed: _pickPhoto,
-                    icon: const Icon(Icons.photo_camera_outlined),
-                    label: Text(t('account.changePhoto')),
-                  ),
-                  if (hasImage)
-                    TextButton(
-                      onPressed: () => setState(() {
-                        _imageUrl = null;
-                        _clearImage = true;
-                      }),
-                      child: Text(t('account.removePhoto')),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_uploadingPhoto)
+                    const BakeryLoadingCenter()
+                  else ...[
+                    OutlinedButton.icon(
+                      onPressed: _pickPhoto,
+                      icon: const Icon(Icons.photo_camera_outlined),
+                      label: Text(t('account.changePhoto')),
+                    ),
+                    if (hasImage)
+                      TextButton(
+                        onPressed: _removePhoto,
+                        child: Text(t('account.removePhoto')),
+                      ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _nameController,
-            decoration: InputDecoration(
-              labelText: t('account.name'),
-              border: const OutlineInputBorder(),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                labelText: t('account.name'),
+                border: const OutlineInputBorder(),
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: InputDecoration(
-              labelText: t('account.email'),
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _phoneController,
-            decoration: InputDecoration(
-              labelText: t('account.phone'),
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            t('account.passwordHint'),
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _currentPasswordController,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: t('account.currentPassword'),
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _newPasswordController,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: t('account.newPassword'),
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _confirmPasswordController,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: t('account.confirmPassword'),
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          if (_error != null) ...[
             const SizedBox(height: 12),
-            Text(_error!, style: const TextStyle(color: Colors.red)),
-          ],
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: (_saving || _uploadingPhoto) ? null : _submit,
-            child: Text(
-              _saving ? t('account.saving') : t('account.save'),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: t('account.email'),
+                border: const OutlineInputBorder(),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            TextField(
+              controller: _phoneController,
+              decoration: InputDecoration(
+                labelText: t('account.phone'),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              t('account.passwordHint'),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _currentPasswordController,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: t('account.currentPassword'),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _newPasswordController,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: t('account.newPassword'),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _confirmPasswordController,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: t('account.confirmPassword'),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(_error!, style: const TextStyle(color: Colors.red)),
+            ],
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: (_saving || _uploadingPhoto) ? null : _submit,
+              child: Text(
+                _saving ? t('account.saving') : t('account.save'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

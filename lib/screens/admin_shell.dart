@@ -17,6 +17,8 @@ import '../widgets/bakery_loading_spinner.dart';
 import '../widgets/bill_modal.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/locale_toggle.dart';
+import '../widgets/notifications_bell_button.dart';
+import '../widgets/notifications_screen.dart';
 import 'account_settings_screen.dart';
 
 class AdminShell extends StatefulWidget {
@@ -59,7 +61,8 @@ class _AdminShellState extends State<AdminShell> {
     ),
     _AdminSection(6, 'nav.shops', Icons.storefront_outlined),
     _AdminSection(7, 'nav.calendar', Icons.calendar_month_outlined),
-    _AdminSection(8, 'nav.settings', Icons.settings_outlined),
+    _AdminSection(8, 'nav.notifications', Icons.notifications_outlined),
+    _AdminSection(9, 'nav.settings', Icons.settings_outlined),
   ];
 
   @override
@@ -124,6 +127,11 @@ class _AdminShellState extends State<AdminShell> {
           businessSettings: _businessSettings,
         );
       case 8:
+        return NotificationsScreen(
+          apiService: widget.apiService,
+          showAppBar: false,
+        );
+      case 9:
         return _AdminSettingsPage(
           apiService: widget.apiService,
           user: widget.user,
@@ -167,6 +175,7 @@ class _AdminShellState extends State<AdminShell> {
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
         actions: [
+          NotificationsBellButton(apiService: widget.apiService),
           const LocaleToggle(),
           IconButton(
             tooltip: t('common.logout'),

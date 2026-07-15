@@ -18,6 +18,8 @@ import '../widgets/bakery_app_bar.dart';
 import '../widgets/bakery_loading_spinner.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/locale_toggle.dart';
+import '../widgets/notifications_bell_button.dart';
+import '../widgets/notifications_screen.dart';
 import 'account_settings_screen.dart';
 import 'add_shop_screen.dart';
 
@@ -58,6 +60,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
     _DeliveryNavItem(0, 'delivery.myAssignments', Icons.inventory_2_outlined),
     _DeliveryNavItem(1, 'delivery.mySales', Icons.storefront_outlined),
     _DeliveryNavItem(2, 'delivery.saleHistory', Icons.history_outlined),
+    _DeliveryNavItem(3, 'nav.notifications', Icons.notifications_outlined),
   ];
 
   _DeliveryNavItem get _currentNav =>
@@ -766,6 +769,10 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
         actions: [
+          NotificationsBellButton(
+            apiService: widget.apiService,
+            deliveryMode: true,
+          ),
           const LocaleToggle(),
           IconButton(
             tooltip: t('common.refresh'),
@@ -834,7 +841,12 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+              padding: EdgeInsets.fromLTRB(
+                12,
+                0,
+                12,
+                16 + systemBottomInset(context),
+              ),
               child: Column(
                 children: [
                   ListTile(
@@ -911,7 +923,13 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                         ? _assignmentsTab(t)
                         : _section == 1
                             ? _mySalesTab(t)
-                            : _historyTab(t),
+                            : _section == 2
+                                ? _historyTab(t)
+                                : NotificationsScreen(
+                                    apiService: widget.apiService,
+                                    showAppBar: false,
+                                    deliveryMode: true,
+                                  ),
                   ),
           ),
         ],

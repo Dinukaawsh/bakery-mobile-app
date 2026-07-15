@@ -54,7 +54,19 @@ const Map<String, String> stringsEn = {
   'nav.shops': 'Shops',
   'nav.shopDrops': 'Shop Drops',
   'nav.calendar': 'Calendar',
+  'nav.notifications': 'Notifications',
   'nav.settings': 'Settings',
+
+  'shell.notificationsAria': 'Notifications',
+  'shell.markAllRead': 'Mark all read',
+
+  'notifications.empty': 'No notifications yet.',
+  'notifications.unread': 'Unread',
+  'notifications.pageStatus': 'Page {page} of {totalPages} • {total} total',
+  'notifications.previous': 'Previous',
+  'notifications.next': 'Next',
+  'notifications.deliveryHint':
+      'Only the last 7 days of notifications are kept for delivery partners.',
 
   'delivery.titleNew': 'New delivery',
   'delivery.recordDelivery': 'Record delivery',
@@ -180,6 +192,8 @@ const Map<String, String> stringsEn = {
   'account.save': 'Save changes',
   'account.saving': 'Saving...',
   'account.updated': 'Account updated',
+  'account.photoSaved': 'Profile photo saved',
+  'account.photoRemoved': 'Profile photo removed',
   'account.passwordMismatch': 'New passwords do not match',
   'account.passwordHint':
       'Enter current password when changing email or password.',

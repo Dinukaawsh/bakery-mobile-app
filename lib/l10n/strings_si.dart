@@ -54,7 +54,19 @@ const Map<String, String> stringsSi = {
   'nav.shops': 'සාප්පු',
   'nav.shopDrops': 'සාප්පු බෙදාහැරීම්',
   'nav.calendar': 'දින දර්ශනය',
+  'nav.notifications': 'දැනුම්දීම්',
   'nav.settings': 'සැකසුම්',
+
+  'shell.notificationsAria': 'දැනුම්දීම්',
+  'shell.markAllRead': 'සියල්ල කියවූ ලෙස සලකුණු කරන්න',
+
+  'notifications.empty': 'තවම දැනුම්දීම් නැත.',
+  'notifications.unread': 'නොකියවූ',
+  'notifications.pageStatus': 'පිටුව {page} / {totalPages} • මුළු {total}',
+  'notifications.previous': 'පෙර',
+  'notifications.next': 'ඊළඟ',
+  'notifications.deliveryHint':
+      'බෙදාහැරීමේ හවුල්කරුවන්ට තබා ගන්නේ පසුගිය දින 7ක දැනුම්දීම් පමණි.',
 
   'delivery.titleNew': 'නව බෙදාහැරීම',
   'delivery.recordDelivery': 'බෙදාහැරීම වාර්තා කරන්න',
@@ -180,6 +192,8 @@ const Map<String, String> stringsSi = {
   'account.save': 'වෙනස්කම් සුරකින්න',
   'account.saving': 'සුරකිමින්...',
   'account.updated': 'ගිණුම යාවත්කාලීන විය',
+  'account.photoSaved': 'පැතිකඩ ඡායාරූපය සුරකින ලදී',
+  'account.photoRemoved': 'පැතිකඩ ඡායාරූපය ඉවත් කරන ලදී',
   'account.passwordMismatch': 'නව මුරපද නොගැලපේ',
   'account.passwordHint':
       'විද්‍යුත් තැපෑල හෝ මුරපදය වෙනස් කරන විට වත්මන් මුරපදය ඇතුළත් කරන්න.',
