@@ -42,20 +42,35 @@ class DeliveryHomeScreen extends StatefulWidget {
 }
 
 class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
-  int _tab = 0;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  /// 0 = Assignments (default), 1 = My sales, 2 = History
+  int _section = 0;
   List<Sale> _todaySales = [];
   List<ShopDropSummary> _recentDrops = [];
   List<Shop> _shops = [];
   List<AllocationSummary> _allocations = [];
   late BusinessSettings _businessSettings;
   String? _error;
+  bool _loading = true;
 
-  String _sevenDaysAgoDate() {
-    final start = DateTime.now().toLocal().subtract(const Duration(days: 6));
-    return localDateString(start);
-  }
+  static const _navItems = [
+    _DeliveryNavItem(0, 'delivery.myAssignments', Icons.inventory_2_outlined),
+    _DeliveryNavItem(1, 'delivery.mySales', Icons.storefront_outlined),
+    _DeliveryNavItem(2, 'delivery.saleHistory', Icons.history_outlined),
+  ];
+
+  _DeliveryNavItem get _currentNav =>
+      _navItems.firstWhere((item) => item.index == _section);
+
+  String _sevenDaysAgoDate() => colomboDaysAgoDateString(7);
 
   String _todayDate() => localDateString();
+
+  void _selectSection(int index) {
+    setState(() => _section = index);
+    Navigator.of(context).maybePop();
+  }
 
   @override
   void initState() {
@@ -84,10 +99,14 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
         _shops = shops;
         _allocations = allocations;
         _error = null;
+        _loading = false;
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.toString());
+      setState(() {
+        _error = error.toString();
+        _loading = false;
+      });
     }
   }
 
@@ -117,6 +136,17 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
     await _load();
   }
 
+  Future<void> _openBill(int saleId) async {
+    await showBillModal(
+      context,
+      apiService: widget.apiService,
+      saleId: saleId,
+      businessSettings: _businessSettings,
+    );
+    if (!mounted) return;
+    await _load();
+  }
+
   Future<void> _confirmLogout() async {
     final t = LocaleScope.of(context).t;
     final shouldLogout = await showConfirmDialog(
@@ -132,15 +162,19 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
 
   int get _totalAssigned =>
       _allocations.fold(0, (sum, item) => sum + item.allocated);
-  int get _totalSold =>
-      _allocations.fold(0, (sum, item) => sum + item.sold);
+  int get _totalSold => _allocations.fold(0, (sum, item) => sum + item.sold);
   int get _totalLeft =>
       _allocations.fold(0, (sum, item) => sum + item.remaining);
+
+  EdgeInsets get _listPadding => EdgeInsets.only(
+        bottom: 88 + systemBottomInset(context),
+      );
 
   Widget _stockStat({
     required String label,
     required int value,
     required Color color,
+    double fontSize = 22,
   }) {
     return Expanded(
       child: Column(
@@ -148,7 +182,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
           Text(
             '$value',
             style: TextStyle(
-              fontSize: 22,
+              fontSize: fontSize,
               fontWeight: FontWeight.w800,
               color: color,
               height: 1.1,
@@ -169,133 +203,128 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
     );
   }
 
-  Widget _stockSummaryBanner(String Function(String, [Map<String, Object?>?]) t) {
-    final empty = _allocations.isEmpty;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => setState(() => _tab = 2),
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
-            ),
-            border: Border.all(color: const Color(0xFFFDBA74)),
-          ),
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.inventory_2_outlined,
-                    size: 18,
-                    color: Color(0xFFB45309),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      t('delivery.stockTodayTitle'),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF92400E),
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                  if (_tab != 2)
-                    Text(
-                      t('delivery.myStock'),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFFB45309),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              if (empty)
-                Text(
-                  t('delivery.noStockToday'),
-                  style: const TextStyle(color: Color(0xFF78716C)),
-                )
-              else
-                Row(
-                  children: [
-                    _stockStat(
-                      label: t('delivery.stockAssigned'),
-                      value: _totalAssigned,
-                      color: const Color(0xFF1C1917),
-                    ),
-                    Container(width: 1, height: 36, color: const Color(0xFFFDBA74)),
-                    _stockStat(
-                      label: t('delivery.stockSold'),
-                      value: _totalSold,
-                      color: const Color(0xFF15803D),
-                    ),
-                    Container(width: 1, height: 36, color: const Color(0xFFFDBA74)),
-                    _stockStat(
-                      label: t('delivery.stockLeft'),
-                      value: _totalLeft,
-                      color: const Color(0xFFB45309),
-                    ),
-                  ],
+  Widget _productThumb(String? imageUrl, {double size = 64}) {
+    final hasImage = imageUrl != null && imageUrl.trim().isNotEmpty;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: size,
+        height: size,
+        color: const Color(0xFFFFEDD5),
+        child: hasImage
+            ? Image.network(
+                imageUrl.trim(),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.bakery_dining,
+                  color: Color(0xFFB45309),
                 ),
-            ],
-          ),
-        ),
+              )
+            : const Icon(
+                Icons.bakery_dining,
+                color: Color(0xFFB45309),
+                size: 28,
+              ),
       ),
     );
   }
 
-  Widget _stockProductCard(
+  Widget _assignmentCard(
     AllocationSummary item,
     String Function(String, [Map<String, Object?>?]) t,
   ) {
+    final desc = item.productDescription?.trim();
+    final price = item.productPrice;
+    final category = item.productCategory?.trim();
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE7E5E4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            item.productName,
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 15,
-              color: Color(0xFF1C1917),
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _productThumb(item.productImageUrl),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.productName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: Color(0xFF1C1917),
+                      ),
+                    ),
+                    if (category != null && category.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        category,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFFA8A29E),
+                        ),
+                      ),
+                    ],
+                    if (price != null && price.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        formatCurrencyFromString(price),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFB45309),
+                        ),
+                      ),
+                    ],
+                    if (desc != null && desc.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        desc,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF57534E),
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Row(
             children: [
               _stockStat(
                 label: t('delivery.stockAssigned'),
                 value: item.allocated,
                 color: const Color(0xFF1C1917),
+                fontSize: 20,
               ),
               Container(width: 1, height: 32, color: const Color(0xFFE7E5E4)),
               _stockStat(
                 label: t('delivery.stockSold'),
                 value: item.sold,
                 color: const Color(0xFF15803D),
+                fontSize: 20,
               ),
               Container(width: 1, height: 32, color: const Color(0xFFE7E5E4)),
               _stockStat(
                 label: t('delivery.stockLeft'),
                 value: item.remaining,
                 color: const Color(0xFFB45309),
+                fontSize: 20,
               ),
             ],
           ),
@@ -304,33 +333,440 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
     );
   }
 
+  Widget _saleCard(
+    Sale sale,
+    String Function(String, [Map<String, Object?>?]) t,
+  ) {
+    final droppedQty =
+        sale.items.fold<int>(0, (sum, item) => sum + item.quantity);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE7E5E4)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => _openBill(sale.id),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          sale.shopName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
+                        if (sale.shopAddress != null &&
+                            sale.shopAddress!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            sale.shopAddress!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF78716C),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+                        Text(
+                          sale.saleDate.toLocal().toString().split('.').first,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFFA8A29E),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        formatCurrencyFromString(sale.totalAmount),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        sale.billPrinted
+                            ? t('delivery.billPrinted')
+                            : t('delivery.billPending'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: sale.billPrinted
+                              ? const Color(0xFF15803D)
+                              : const Color(0xFFEA580C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              if (sale.items.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                ...sale.items.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        _productThumb(item.productImageUrl, size: 36),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            item.productName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '× ${item.quantity}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFB45309),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Text(
+                  t('delivery.droppedQty', {'count': droppedQty}),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF57534E),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Text(
+                t('delivery.viewBill'),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFB45309),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _historyCard(
+    ShopDropSummary drop,
+    String Function(String, [Map<String, Object?>?]) t,
+  ) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE7E5E4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      drop.shopName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      drop.dropDate,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFFA8A29E),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    formatCurrencyFromString(drop.totalAmount),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  Text(
+                    t('delivery.itemsCount', {'count': drop.totalQuantity}),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          if (drop.items.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              drop.itemsLabel,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF57534E),
+                height: 1.35,
+              ),
+            ),
+          ],
+          if (drop.sales.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            ...drop.sales.map(
+              (sale) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        sale.billPrinted
+                            ? t('delivery.billPrinted')
+                            : t('delivery.billPending'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: sale.billPrinted
+                              ? const Color(0xFF15803D)
+                              : const Color(0xFFEA580C),
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => _openBill(sale.id),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFFB45309),
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 32),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(t('delivery.viewBill')),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _assignmentsTab(String Function(String, [Map<String, Object?>?]) t) {
+    if (_allocations.isEmpty) {
+      return ListView(
+        padding: _listPadding,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(t('delivery.noAssignmentsToday')),
+          ),
+        ],
+      );
+    }
+
+    return ListView(
+      padding: _listPadding,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
+              ),
+              border: Border.all(color: const Color(0xFFFDBA74)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  t('delivery.stockTodayTitle'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF92400E),
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    _stockStat(
+                      label: t('delivery.stockAssigned'),
+                      value: _totalAssigned,
+                      color: const Color(0xFF1C1917),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 36,
+                      color: const Color(0xFFFDBA74),
+                    ),
+                    _stockStat(
+                      label: t('delivery.stockSold'),
+                      value: _totalSold,
+                      color: const Color(0xFF15803D),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 36,
+                      color: const Color(0xFFFDBA74),
+                    ),
+                    _stockStat(
+                      label: t('delivery.stockLeft'),
+                      value: _totalLeft,
+                      color: const Color(0xFFB45309),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text(
+            t('delivery.stockSummaryHint'),
+            style: const TextStyle(fontSize: 13, color: Color(0xFF78716C)),
+          ),
+        ),
+        ..._allocations.map((item) => _assignmentCard(item, t)),
+      ],
+    );
+  }
+
+  Widget _mySalesTab(String Function(String, [Map<String, Object?>?]) t) {
+    if (_todaySales.isEmpty) {
+      return ListView(
+        padding: _listPadding,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(t('delivery.noSalesToday')),
+          ),
+        ],
+      );
+    }
+
+    final shopsVisited = _todaySales.map((s) => s.shopId).toSet().length;
+
+    return ListView(
+      padding: _listPadding,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: Text(
+            t('delivery.visitedShops', {'count': shopsVisited}),
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF57534E),
+            ),
+          ),
+        ),
+        ..._todaySales.map((sale) => _saleCard(sale, t)),
+      ],
+    );
+  }
+
+  Widget _historyTab(String Function(String, [Map<String, Object?>?]) t) {
+    if (_recentDrops.isEmpty) {
+      return ListView(
+        padding: _listPadding,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(t('delivery.noSalesHistory')),
+          ),
+        ],
+      );
+    }
+
+    return ListView(
+      padding: _listPadding,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+          child: Text(
+            t('delivery.historyHint'),
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF78716C),
+              fontFamily: 'NotoSansSinhala',
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: Text(
+            t('delivery.dropsCount', {'count': _recentDrops.length}),
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF57534E),
+            ),
+          ),
+        ),
+        ..._recentDrops.map((drop) => _historyCard(drop, t)),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = LocaleScope.of(context).t;
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: const Color(0xFFFFFBEB),
       appBar: AppBar(
-        title: Text('${_businessSettings.businessName} • ${widget.user.name}'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _businessSettings.businessName,
+              style: const TextStyle(fontSize: 12),
+            ),
+            Text(t(_currentNav.labelKey)),
+          ],
+        ),
         backgroundColor: const Color(0xFFB45309),
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+        ),
         actions: [
           const LocaleToggle(),
-          IconButton(
-            tooltip: t('delivery.accountSettings'),
-            onPressed: () async {
-              final updated = await Navigator.of(context).push<AppUser>(
-                MaterialPageRoute(
-                  builder: (_) => AccountSettingsScreen(
-                    apiService: widget.apiService,
-                    user: widget.user,
-                  ),
-                ),
-              );
-              if (updated != null) widget.onUserUpdated(updated);
-            },
-            icon: const Icon(Icons.person),
-          ),
           IconButton(
             tooltip: t('common.refresh'),
             onPressed: _load,
@@ -342,6 +778,105 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
             icon: const Icon(Icons.logout),
           ),
         ],
+      ),
+      drawer: Drawer(
+        child: Column(
+          children: [
+            DrawerHeader(
+              decoration: const BoxDecoration(color: Color(0xFFB45309)),
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      t('delivery.deliveryPanel'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.user.name,
+                      style: const TextStyle(color: Color(0xFFFDE68A)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                children: [
+                  for (final item in _navItems)
+                    _DeliveryDrawerItem(
+                      item: item,
+                      selected: _section == item.index,
+                      onSelect: _selectSection,
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: const Color(0xFFFEF3C7),
+                      backgroundImage: widget.user.imageUrl != null &&
+                              widget.user.imageUrl!.trim().isNotEmpty
+                          ? NetworkImage(widget.user.imageUrl!.trim())
+                          : null,
+                      child: widget.user.imageUrl == null ||
+                              widget.user.imageUrl!.trim().isEmpty
+                          ? const Icon(
+                              Icons.person_outline,
+                              color: Color(0xFFB45309),
+                            )
+                          : null,
+                    ),
+                    title: Text(t('delivery.accountSettings')),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    onTap: () async {
+                      Navigator.of(context).maybePop();
+                      final updated =
+                          await Navigator.of(context).push<AppUser>(
+                        MaterialPageRoute(
+                          builder: (_) => AccountSettingsScreen(
+                            apiService: widget.apiService,
+                            user: widget.user,
+                          ),
+                        ),
+                      );
+                      if (updated != null) widget.onUserUpdated(updated);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.logout, color: Color(0xFFDC2626)),
+                    title: Text(
+                      t('common.logout'),
+                      style: const TextStyle(color: Color(0xFFDC2626)),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    onTap: () {
+                      Navigator.of(context).maybePop();
+                      _confirmLogout();
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: Padding(
         padding: EdgeInsets.only(bottom: systemBottomInset(context)),
@@ -355,200 +890,95 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: SegmentedButton<int>(
-              segments: [
-                ButtonSegment(value: 0, label: Text(t('delivery.today'))),
-                ButtonSegment(
-                  value: 1,
-                  label: Text(t('delivery.last7Days')),
-                ),
-                ButtonSegment(value: 2, label: Text(t('delivery.myStock'))),
-              ],
-              selected: {_tab},
-              onSelectionChanged: (value) {
-                setState(() => _tab = value.first);
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: _stockSummaryBanner(t),
-          ),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.all(12),
               child: Text(_error!, style: const TextStyle(color: Colors.red)),
             ),
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: _load,
-              child: _tab == 2
-                  ? ListView(
-                      padding: EdgeInsets.only(
-                        bottom: 88 + systemBottomInset(context),
-                      ),
-                      children: _allocations.isEmpty
-                          ? [
-                              Padding(
-                                padding: const EdgeInsets.all(24),
-                                child: Text(t('delivery.noStockToday')),
-                              ),
-                            ]
-                          : [
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  16,
-                                  4,
-                                  16,
-                                  8,
-                                ),
-                                child: Text(
-                                  t('delivery.stockSummaryHint'),
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFF78716C),
-                                  ),
-                                ),
-                              ),
-                              ..._allocations.map(
-                                (item) => _stockProductCard(item, t),
-                              ),
-                            ],
-                    )
-                  : _tab == 1
-                      ? ListView(
-                          padding: EdgeInsets.only(
-                            bottom: 88 + systemBottomInset(context),
-                          ),
-                          children: _recentDrops.isEmpty
-                              ? [
-                                  Padding(
-                                    padding: const EdgeInsets.all(24),
-                                    child: Text(t('delivery.noDropsPeriod')),
-                                  ),
-                                ]
-                              : _recentDrops
-                                  .map(
-                                    (drop) => Card(
-                                      margin: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 8,
-                                      ),
-                                      child: ListTile(
-                                        title: Text(drop.shopName),
-                                        subtitle: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(drop.dropDate),
-                                            const SizedBox(height: 4),
-                                            Text(drop.itemsLabel),
-                                          ],
-                                        ),
-                                        isThreeLine: true,
-                                        trailing: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.end,
-                                          children: [
-                                            Text(
-                                              formatCurrencyFromString(
-                                                drop.totalAmount,
-                                              ),
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            Text(
-                                              t(
-                                                'delivery.itemsCount',
-                                                {
-                                                  'count': drop.totalQuantity,
-                                                },
-                                              ),
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                        )
-                      : ListView(
-                          padding: EdgeInsets.only(
-                            bottom: 88 + systemBottomInset(context),
-                          ),
-                          children: _todaySales.isEmpty
-                              ? [
-                                  Padding(
-                                    padding: const EdgeInsets.all(24),
-                                    child: Text(
-                                      t('delivery.noDeliveriesToday'),
-                                    ),
-                                  ),
-                                ]
-                              : _todaySales
-                                  .map(
-                                    (sale) => Card(
-                                      margin: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 8,
-                                      ),
-                                      child: ListTile(
-                                        title: Text(sale.shopName),
-                                        subtitle: Text(
-                                          sale.saleDate.toLocal().toString(),
-                                        ),
-                                        trailing: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.end,
-                                          children: [
-                                            Text(
-                                              formatCurrencyFromString(
-                                                sale.totalAmount,
-                                              ),
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            Text(
-                                              sale.billPrinted
-                                                  ? t('delivery.billPrinted')
-                                                  : t('delivery.billPending'),
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: sale.billPrinted
-                                                    ? Colors.green
-                                                    : Colors.orange,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        onTap: () async {
-                                          await showBillModal(
-                                            context,
-                                            apiService: widget.apiService,
-                                            saleId: sale.id,
-                                            businessSettings: _businessSettings,
-                                          );
-                                          await _load();
-                                        },
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                        ),
-            ),
+            child: _loading
+                ? const BakeryLoadingCenter()
+                : RefreshIndicator(
+                    onRefresh: _load,
+                    child: _section == 0
+                        ? _assignmentsTab(t)
+                        : _section == 1
+                            ? _mySalesTab(t)
+                            : _historyTab(t),
+                  ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DeliveryNavItem {
+  const _DeliveryNavItem(this.index, this.labelKey, this.icon);
+
+  final int index;
+  final String labelKey;
+  final IconData icon;
+}
+
+class _DeliveryDrawerItem extends StatelessWidget {
+  const _DeliveryDrawerItem({
+    required this.item,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final _DeliveryNavItem item;
+  final bool selected;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        color: selected ? const Color(0xFFB45309) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => onSelect(item.index),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? Colors.white.withValues(alpha: 0.18)
+                        : const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    item.icon,
+                    size: 20,
+                    color:
+                        selected ? Colors.white : const Color(0xFFB45309),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    t(item.labelKey),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color:
+                          selected ? Colors.white : const Color(0xFF1C1917),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -663,7 +1093,10 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
         }
       }
       final name = product?.name ?? allocation?.productName ?? 'Product';
-      final price = double.tryParse(product?.price ?? '0') ?? 0;
+      final price = double.tryParse(
+            product?.price ?? allocation?.productPrice ?? '0',
+          ) ??
+          0;
       items.add(
         BillLineItem(
           productName: name,
@@ -736,6 +1169,33 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Widget _productThumb(String? imageUrl) {
+    final hasImage = imageUrl != null && imageUrl.trim().isNotEmpty;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 44,
+        height: 44,
+        color: const Color(0xFFFFEDD5),
+        child: hasImage
+            ? Image.network(
+                imageUrl.trim(),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.bakery_dining,
+                  color: Color(0xFFB45309),
+                  size: 22,
+                ),
+              )
+            : const Icon(
+                Icons.bakery_dining,
+                color: Color(0xFFB45309),
+                size: 22,
+              ),
+      ),
+    );
   }
 
   @override
@@ -841,7 +1301,6 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
-          const SizedBox(height: 8),
           if (_loadingAllocations)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
@@ -852,9 +1311,12 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
           else
             ..._availableAllocations.map((allocation) {
               final qty = _quantities[allocation.productId] ?? 0;
+              final product = _productMap[allocation.productId];
+              final imageUrl =
+                  allocation.productImageUrl ?? product?.imageUrl;
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
@@ -862,6 +1324,8 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                 ),
                 child: Row(
                   children: [
+                    _productThumb(imageUrl),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -872,7 +1336,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           Text(
                             '${t('delivery.stockAssigned')}: ${allocation.allocated}  ·  '
                             '${t('delivery.stockSold')}: ${allocation.sold}  ·  '

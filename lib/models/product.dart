@@ -5,6 +5,7 @@ class Product {
   final String price;
   final String category;
   final int stockAvailable;
+  final String? imageUrl;
   final bool isActive;
 
   const Product({
@@ -14,6 +15,7 @@ class Product {
     required this.price,
     required this.category,
     required this.stockAvailable,
+    this.imageUrl,
     required this.isActive,
   });
 
@@ -25,6 +27,7 @@ class Product {
       price: json['price'] as String,
       category: json['category'] as String,
       stockAvailable: json['stockAvailable'] as int,
+      imageUrl: json['imageUrl'] as String?,
       isActive: json['isActive'] as bool? ?? true,
     );
   }

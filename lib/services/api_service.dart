@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
@@ -12,6 +13,7 @@ import '../models/sale.dart';
 import '../models/shop.dart';
 import '../models/shop_drop.dart';
 import '../models/user.dart';
+import '../utils/dates.dart';
 
 class ApiService {
   ApiService({http.Client? client}) : _client = client ?? http.Client();
@@ -19,6 +21,7 @@ class ApiService {
   final http.Client _client;
   final String _baseUrl = AppConfig.apiBaseUrl;
   String? _token;
+  void Function()? onAccountSuspended;
 
   Future<void> loadToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -44,9 +47,25 @@ class ApiService {
     };
   }
 
+  bool _isSuspendedPayload(Map<String, dynamic> data) {
+    final code = data['code']?.toString();
+    final error = data['error']?.toString();
+    return code == 'ACCOUNT_SUSPENDED' || error == 'ACCOUNT_SUSPENDED';
+  }
+
   Future<Map<String, dynamic>> _decode(http.Response response) async {
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final raw = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(raw);
+    final data = decoded is Map<String, dynamic>
+        ? decoded
+        : <String, dynamic>{'error': 'Request failed'};
+
     if (response.statusCode >= 400) {
+      if (_isSuspendedPayload(data)) {
+        await clearToken();
+        onAccountSuspended?.call();
+        throw AccountSuspendedException();
+      }
       throw Exception(data['error'] ?? 'Request failed');
     }
     return data;
@@ -71,19 +90,17 @@ class ApiService {
       headers: _headers(),
     );
     final data = await _decode(response);
-    return AppUser.fromJson(data['user'] as Map<String, dynamic>);
+    final user = AppUser.fromJson(data['user'] as Map<String, dynamic>);
+    return user.copyWith(
+      phone: data['phone'] as String?,
+      imageUrl: data['imageUrl'] as String?,
+      clearImageUrl: data['imageUrl'] == null,
+    );
   }
 
-  Future<({AppUser user, String? phone})> getProfile() async {
-    final response = await _client.get(
-      Uri.parse('$_baseUrl/api/auth/me'),
-      headers: _headers(),
-    );
-    final data = await _decode(response);
-    return (
-      user: AppUser.fromJson(data['user'] as Map<String, dynamic>),
-      phone: data['phone'] as String?,
-    );
+  Future<({AppUser user, String? phone, String? imageUrl})> getProfile() async {
+    final me = await getMe();
+    return (user: me, phone: me.phone, imageUrl: me.imageUrl);
   }
 
   Future<BusinessSettings> fetchBusinessSettings() async {
@@ -107,11 +124,53 @@ class ApiService {
   }
 
   Future<void> logout() async {
-    await _client.post(
-      Uri.parse('$_baseUrl/api/auth/logout'),
-      headers: _headers(),
-    );
+    try {
+      await _client.post(
+        Uri.parse('$_baseUrl/api/auth/logout'),
+        headers: _headers(),
+      );
+    } catch (_) {
+      // Always clear local session.
+    }
     await clearToken();
+  }
+
+  Future<String> uploadImage({
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$_baseUrl/api/upload'),
+    );
+    if (_token != null) {
+      request.headers['Authorization'] = 'Bearer $_token';
+    }
+
+    final lower = filename.toLowerCase();
+    final mime = lower.endsWith('.png')
+        ? MediaType('image', 'png')
+        : lower.endsWith('.webp')
+            ? MediaType('image', 'webp')
+            : MediaType('image', 'jpeg');
+
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: mime,
+      ),
+    );
+
+    final streamed = await _client.send(request);
+    final response = await http.Response.fromStream(streamed);
+    final data = await _decode(response);
+    final url = data['url'] as String?;
+    if (url == null || url.isEmpty) {
+      throw Exception('Upload failed');
+    }
+    return url;
   }
 
   Future<AppUser> updateProfile({
@@ -120,6 +179,8 @@ class ApiService {
     String? password,
     String? name,
     String? phone,
+    String? imageUrl,
+    bool clearImageUrl = false,
   }) async {
     final response = await _client.patch(
       Uri.parse('$_baseUrl/api/auth/profile'),
@@ -130,18 +191,25 @@ class ApiService {
         if (password != null) 'password': password,
         if (name != null) 'name': name,
         if (phone != null) 'phone': phone,
+        if (clearImageUrl) 'imageUrl': null,
+        if (!clearImageUrl && imageUrl != null) 'imageUrl': imageUrl,
       }),
     );
 
     final data = await _decode(response);
     final token = data['token'] as String;
     await saveToken(token);
-    return AppUser.fromJson(data['user'] as Map<String, dynamic>);
+    final user = AppUser.fromJson(data['user'] as Map<String, dynamic>);
+    return user.copyWith(
+      phone: data['phone'] as String?,
+      imageUrl: data['imageUrl'] as String?,
+      clearImageUrl: data['imageUrl'] == null,
+    );
   }
 
   Future<List<AllocationSummary>> fetchMyAllocations({String? date}) async {
     final params = <String, String>{
-      'date': date ?? _localDateString(),
+      'date': date ?? localDateString(),
     };
 
     final uri = Uri.parse('$_baseUrl/api/allocations').replace(
@@ -305,7 +373,7 @@ class ApiService {
     String? historyDateTo,
   }) async {
     final params = <String, String>{
-      'date': date ?? _localDateString(),
+      'date': date ?? localDateString(),
     };
     if (deliveryGuyId != null) {
       params['deliveryGuyId'] = deliveryGuyId.toString();
@@ -349,12 +417,5 @@ class ApiService {
       }),
     );
     await _decode(response);
-  }
-
-  String _localDateString() {
-    final now = DateTime.now().toLocal();
-    final month = now.month.toString().padLeft(2, '0');
-    final day = now.day.toString().padLeft(2, '0');
-    return '${now.year}-$month-$day';
   }
 }

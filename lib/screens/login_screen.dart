@@ -13,11 +13,13 @@ class LoginScreen extends StatefulWidget {
     required this.apiService,
     required this.businessSettings,
     required this.onLoggedIn,
+    this.onSuspended,
   });
 
   final ApiService apiService;
   final BusinessSettings businessSettings;
   final ValueChanged<AppUser> onLoggedIn;
+  final VoidCallback? onSuspended;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -54,9 +56,14 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text,
       );
       widget.onLoggedIn(user);
+    } on AccountSuspendedException {
+      widget.onSuspended?.call();
     } catch (error) {
+      final message = error.toString().replaceFirst('Exception: ', '');
       setState(() {
-        _error = error.toString().replaceFirst('Exception: ', '');
+        _error = message == 'ACCOUNT_SUSPENDED'
+            ? LocaleScope.of(context).t('auth.loginSuspended')
+            : message;
       });
     } finally {
       if (mounted) setState(() => _loading = false);

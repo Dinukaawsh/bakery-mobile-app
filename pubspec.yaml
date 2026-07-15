@@ -10,6 +10,8 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.2.2
+  http_parser: ^4.1.2
+  image_picker: ^1.2.3
   pdf: ^3.11.3
   printing: ^5.14.2
   shared_preferences: ^2.3.3

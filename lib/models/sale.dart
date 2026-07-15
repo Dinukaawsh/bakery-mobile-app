@@ -105,6 +105,7 @@ class SaleItem {
   final int quantity;
   final String unitPrice;
   final String productName;
+  final String? productImageUrl;
 
   const SaleItem({
     required this.id,
@@ -112,6 +113,7 @@ class SaleItem {
     required this.quantity,
     required this.unitPrice,
     required this.productName,
+    this.productImageUrl,
   });
 
   factory SaleItem.fromJson(Map<String, dynamic> json) {
@@ -121,6 +123,7 @@ class SaleItem {
       quantity: json['quantity'] as int,
       unitPrice: json['unitPrice'] as String,
       productName: json['productName'] as String? ?? '',
+      productImageUrl: json['productImageUrl'] as String?,
     );
   }
 }

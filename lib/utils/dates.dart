@@ -12,3 +12,13 @@ String localDateString([DateTime? date]) {
   final day = colombo.day.toString().padLeft(2, '0');
   return '${colombo.year}-$month-$day';
 }
+
+/// Inclusive start of the last N calendar days in Sri Lanka
+/// (N=7 → today and the previous 6 days).
+String colomboDaysAgoDateString(int daysInclusive) {
+  final colombo = toColombo(DateTime.now());
+  final start = colombo.subtract(Duration(days: daysInclusive - 1));
+  final month = start.month.toString().padLeft(2, '0');
+  final day = start.day.toString().padLeft(2, '0');
+  return '${start.year}-$month-$day';
+}
