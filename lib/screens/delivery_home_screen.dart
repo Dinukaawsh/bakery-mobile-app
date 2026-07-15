@@ -577,9 +577,16 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                         (shop) => DropdownMenuItem(
                           value: shop,
                           child: Text(
-                            shop.route == null || shop.route!.isEmpty
-                                ? shop.name
-                                : '${shop.name} (${shop.route})',
+                            () {
+                              final route = shop.route == null ||
+                                      shop.route!.isEmpty
+                                  ? ''
+                                  : ' (${shop.route})';
+                              final owes = shop.outstandingAsDouble > 0
+                                  ? ' • Owes ${shop.outstandingBalance}'
+                                  : '';
+                              return '${shop.name}$route$owes';
+                            }(),
                           ),
                         ),
                       )
@@ -688,6 +695,8 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
               saleDate: DateTime.now(),
               items: _previewItems,
               totalAmount: _previewTotal,
+              previousBalance: _selectedShop?.outstandingAsDouble ?? 0,
+              paidAmount: 0,
               shopOwner: _selectedShop?.ownerName,
               shopAddress: _selectedShop?.address,
               shopPhone: _selectedShop?.phone,

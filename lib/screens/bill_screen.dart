@@ -4,6 +4,7 @@ import '../models/business_settings.dart';
 import '../models/sale.dart';
 import '../services/api_service.dart';
 import '../utils/bill_print.dart';
+import '../utils/currency.dart';
 import '../widgets/bill_receipt_card.dart';
 
 class BillScreen extends StatefulWidget {
@@ -29,11 +30,19 @@ class _BillScreenState extends State<BillScreen> {
   String? _error;
   bool _loading = true;
   bool _printing = false;
+  bool _savingPayment = false;
+  final _paidController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _paidController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -42,6 +51,7 @@ class _BillScreenState extends State<BillScreen> {
       if (!mounted) return;
       setState(() {
         _sale = sale;
+        _paidController.text = sale.paidAmount;
         _error = null;
         _loading = false;
       });
@@ -66,9 +76,54 @@ class _BillScreenState extends State<BillScreen> {
         .toList();
   }
 
-  double _total(Sale sale) {
+  double _todayTotal(Sale sale) {
     return double.tryParse(sale.totalAmount) ??
         _lineItems(sale).fold(0, (sum, item) => sum + item.lineTotal);
+  }
+
+  double _previous(Sale sale) => double.tryParse(sale.previousBalance) ?? 0;
+
+  double _amountDue(Sale sale) =>
+      double.tryParse(sale.amountDue) ?? (_previous(sale) + _todayTotal(sale));
+
+  double get _paidPreview {
+    final sale = _sale;
+    if (sale == null) return 0;
+    final paid = double.tryParse(_paidController.text.trim()) ?? 0;
+    final due = _amountDue(sale);
+    if (paid < 0) return 0;
+    if (paid > due) return due;
+    return paid;
+  }
+
+  Future<void> _savePayment() async {
+    final sale = _sale;
+    if (sale == null || _savingPayment) return;
+
+    setState(() => _savingPayment = true);
+    try {
+      final updated = await widget.apiService.settleSalePayment(
+        sale.id,
+        _paidPreview,
+      );
+      if (!mounted) return;
+      setState(() {
+        _sale = updated;
+        _paidController.text = updated.paidAmount;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Payment saved')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _savingPayment = false);
+    }
   }
 
   Future<void> _printBill() async {
@@ -77,43 +132,38 @@ class _BillScreenState extends State<BillScreen> {
 
     setState(() => _printing = true);
     try {
+      var current = sale;
+      final paid = _paidPreview;
+      if ((double.tryParse(sale.paidAmount) ?? 0) != paid) {
+        current = await widget.apiService.settleSalePayment(sale.id, paid);
+      }
+
       await printBillReceipt(
         settings: widget.businessSettings,
-        billNumberLabel: 'Delivery Bill #${sale.id}',
-        shopName: sale.shopName,
-        deliveryName: sale.deliveryGuyName,
-        saleDate: sale.saleDate,
-        items: _lineItems(sale),
-        totalAmount: _total(sale),
-        shopOwner: sale.shopOwner,
-        shopAddress: sale.shopAddress,
-        shopPhone: sale.shopPhone,
-        notes: sale.notes,
+        billNumberLabel: 'Delivery Bill #${current.id}',
+        shopName: current.shopName,
+        deliveryName: current.deliveryGuyName,
+        saleDate: current.saleDate,
+        items: _lineItems(current),
+        totalAmount: _todayTotal(current),
+        previousBalance: _previous(current),
+        paidAmount: double.tryParse(current.paidAmount) ?? paid,
+        remainingAfter: double.tryParse(current.remainingAfter),
+        shopOwner: current.shopOwner,
+        shopAddress: current.shopAddress,
+        shopPhone: current.shopPhone,
+        notes: current.notes,
       );
 
-      if (!sale.billPrinted) {
-        await widget.apiService.markBillPrinted(sale.id);
-        if (!mounted) return;
-        setState(() {
-          _sale = Sale(
-            id: sale.id,
-            deliveryGuyId: sale.deliveryGuyId,
-            shopId: sale.shopId,
-            saleDate: sale.saleDate,
-            totalAmount: sale.totalAmount,
-            notes: sale.notes,
-            billPrinted: true,
-            shopName: sale.shopName,
-            deliveryGuyName: sale.deliveryGuyName,
-            shopOwner: sale.shopOwner,
-            shopAddress: sale.shopAddress,
-            shopPhone: sale.shopPhone,
-            items: sale.items,
-          );
-        });
+      if (!current.billPrinted) {
+        current = await widget.apiService.markBillPrinted(current.id);
       }
 
       if (!mounted) return;
+      setState(() {
+        _sale = current;
+        _paidController.text = current.paidAmount;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Bill sent to printer')),
       );
@@ -133,6 +183,8 @@ class _BillScreenState extends State<BillScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final sale = _sale;
+
     return Scaffold(
       backgroundColor: const Color(0xFFFFFBEB),
       appBar: AppBar(
@@ -167,41 +219,45 @@ class _BillScreenState extends State<BillScreen> {
                   children: [
                     BillReceiptCard(
                       settings: widget.businessSettings,
-                      billNumberLabel: 'Delivery Bill #${_sale!.id}',
-                      shopName: _sale!.shopName,
-                      deliveryName: _sale!.deliveryGuyName,
-                      saleDate: _sale!.saleDate,
-                      items: _lineItems(_sale!),
-                      totalAmount: _total(_sale!),
-                      shopOwner: _sale!.shopOwner,
-                      shopAddress: _sale!.shopAddress,
-                      shopPhone: _sale!.shopPhone,
-                      notes: _sale!.notes,
+                      billNumberLabel: 'Delivery Bill #${sale!.id}',
+                      shopName: sale.shopName,
+                      deliveryName: sale.deliveryGuyName,
+                      saleDate: sale.saleDate,
+                      items: _lineItems(sale),
+                      totalAmount: _todayTotal(sale),
+                      previousBalance: _previous(sale),
+                      paidAmount: _paidPreview,
+                      remainingAfter: _amountDue(sale) - _paidPreview,
+                      shopOwner: sale.shopOwner,
+                      shopAddress: sale.shopAddress,
+                      shopPhone: sale.shopPhone,
+                      notes: sale.notes,
                     ),
                     const SizedBox(height: 16),
-                    if (_sale!.billPrinted)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF0FDF4),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF86EFAC)),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.check_circle, color: Color(0xFF16A34A)),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Bill already printed for this delivery.',
-                                style: TextStyle(color: Color(0xFF166534)),
-                              ),
-                            ),
-                          ],
-                        ),
+                    TextField(
+                      controller: _paidController,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        labelText: 'Amount paid (Rs)',
+                        helperText:
+                            'Total due: ${formatCurrency(_amountDue(sale))}',
+                        border: const OutlineInputBorder(),
                       ),
-                    const SizedBox(height: 16),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: _savingPayment ? null : _savePayment,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF78716C),
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      child: Text(
+                        _savingPayment ? 'Saving payment...' : 'Save payment',
+                      ),
+                    ),
+                    const SizedBox(height: 10),
                     FilledButton.icon(
                       onPressed: _printing ? null : _printBill,
                       icon: _printing
@@ -217,7 +273,7 @@ class _BillScreenState extends State<BillScreen> {
                       label: Text(
                         _printing
                             ? 'Opening printer...'
-                            : _sale!.billPrinted
+                            : sale.billPrinted
                                 ? 'Print again'
                                 : 'Print bill for shop',
                       ),

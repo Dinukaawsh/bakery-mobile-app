@@ -4,6 +4,10 @@ class Sale {
   final int shopId;
   final DateTime saleDate;
   final String totalAmount;
+  final String previousBalance;
+  final String paidAmount;
+  final String remainingAfter;
+  final String amountDue;
   final String? notes;
   final bool billPrinted;
   final String shopName;
@@ -19,6 +23,10 @@ class Sale {
     required this.shopId,
     required this.saleDate,
     required this.totalAmount,
+    required this.previousBalance,
+    required this.paidAmount,
+    required this.remainingAfter,
+    required this.amountDue,
     required this.notes,
     required this.billPrinted,
     required this.shopName,
@@ -31,12 +39,24 @@ class Sale {
 
   factory Sale.fromJson(Map<String, dynamic> json) {
     final rawItems = json['items'];
+    final total = json['totalAmount']?.toString() ?? '0';
+    final previous = json['previousBalance']?.toString() ?? '0';
+    final paid = json['paidAmount']?.toString() ?? '0';
+    final remaining = json['remainingAfter']?.toString() ?? '0';
+    final due = json['amountDue']?.toString() ??
+        ((double.tryParse(previous) ?? 0) + (double.tryParse(total) ?? 0))
+            .toStringAsFixed(2);
+
     return Sale(
       id: json['id'] as int,
       deliveryGuyId: json['deliveryGuyId'] as int,
       shopId: json['shopId'] as int,
       saleDate: DateTime.parse(json['saleDate'] as String),
-      totalAmount: json['totalAmount'] as String,
+      totalAmount: total,
+      previousBalance: previous,
+      paidAmount: paid,
+      remainingAfter: remaining,
+      amountDue: due,
       notes: json['notes'] as String?,
       billPrinted: json['billPrinted'] as bool? ?? false,
       shopName: json['shopName'] as String? ?? '',
@@ -49,6 +69,32 @@ class Sale {
               .map((item) => SaleItem.fromJson(item as Map<String, dynamic>))
               .toList()
           : const [],
+    );
+  }
+
+  Sale copyWith({
+    String? paidAmount,
+    String? remainingAfter,
+    bool? billPrinted,
+  }) {
+    return Sale(
+      id: id,
+      deliveryGuyId: deliveryGuyId,
+      shopId: shopId,
+      saleDate: saleDate,
+      totalAmount: totalAmount,
+      previousBalance: previousBalance,
+      paidAmount: paidAmount ?? this.paidAmount,
+      remainingAfter: remainingAfter ?? this.remainingAfter,
+      amountDue: amountDue,
+      notes: notes,
+      billPrinted: billPrinted ?? this.billPrinted,
+      shopName: shopName,
+      deliveryGuyName: deliveryGuyName,
+      shopOwner: shopOwner,
+      shopAddress: shopAddress,
+      shopPhone: shopPhone,
+      items: items,
     );
   }
 }
@@ -83,12 +129,14 @@ class SaleInput {
   final int shopId;
   final String saleDate;
   final String? notes;
+  final double? paidAmount;
   final List<Map<String, int>> items;
 
   const SaleInput({
     required this.shopId,
     required this.saleDate,
     this.notes,
+    this.paidAmount,
     required this.items,
   });
 
@@ -97,6 +145,7 @@ class SaleInput {
       'shopId': shopId,
       'saleDate': saleDate,
       if (notes != null && notes!.isNotEmpty) 'notes': notes,
+      if (paidAmount != null) 'paidAmount': paidAmount,
       'items': items,
     };
   }

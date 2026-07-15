@@ -27,6 +27,9 @@ class BillReceiptCard extends StatelessWidget {
     required this.saleDate,
     required this.items,
     required this.totalAmount,
+    this.previousBalance = 0,
+    this.paidAmount = 0,
+    this.remainingAfter,
     this.shopOwner,
     this.shopAddress,
     this.shopPhone,
@@ -41,11 +44,18 @@ class BillReceiptCard extends StatelessWidget {
   final DateTime saleDate;
   final List<BillLineItem> items;
   final double totalAmount;
+  final double previousBalance;
+  final double paidAmount;
+  final double? remainingAfter;
   final String? shopOwner;
   final String? shopAddress;
   final String? shopPhone;
   final String? notes;
   final bool isPreview;
+
+  double get amountDue => previousBalance + totalAmount;
+  double get remaining =>
+      remainingAfter ?? (amountDue - paidAmount).clamp(0, double.infinity);
 
   @override
   Widget build(BuildContext context) {
@@ -268,24 +278,24 @@ class BillReceiptCard extends StatelessWidget {
                     ),
                   ),
                 const Divider(height: 20, color: Color(0xFFE7E5E4)),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Total (Rs)',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    Text(
-                      formatCurrency(totalAmount),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+                _summaryRow('Today\'s drop (Rs)', formatCurrency(totalAmount)),
+                if (previousBalance > 0)
+                  _summaryRow(
+                    'Previous unpaid (Rs)',
+                    formatCurrency(previousBalance),
+                    color: const Color(0xFFB45309),
+                  ),
+                _summaryRow(
+                  'Total due (Rs)',
+                  formatCurrency(amountDue),
+                  bold: true,
+                ),
+                _summaryRow('Paid (Rs)', formatCurrency(paidAmount)),
+                _summaryRow(
+                  'Remaining (Rs)',
+                  formatCurrency(remaining),
+                  bold: true,
+                  color: const Color(0xFFB91C1C),
                 ),
                 if (notes != null && notes!.isNotEmpty) ...[
                   const SizedBox(height: 10),
@@ -301,6 +311,38 @@ class BillReceiptCard extends StatelessWidget {
                   style: TextStyle(fontSize: 10, color: Color(0xFF78716C)),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryRow(
+    String label,
+    String value, {
+    bool bold = false,
+    Color? color,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontWeight: bold ? FontWeight.bold : FontWeight.w500,
+              fontSize: bold ? 14 : 12,
+              color: color,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: bold ? FontWeight.bold : FontWeight.w500,
+              fontSize: bold ? 14 : 12,
+              color: color,
             ),
           ),
         ],

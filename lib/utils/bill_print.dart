@@ -14,6 +14,9 @@ Future<void> printBillReceipt({
   required DateTime saleDate,
   required List<BillLineItem> items,
   required double totalAmount,
+  double previousBalance = 0,
+  double paidAmount = 0,
+  double? remainingAfter,
   String? shopOwner,
   String? shopAddress,
   String? shopPhone,
@@ -21,6 +24,9 @@ Future<void> printBillReceipt({
 }) async {
   final doc = pw.Document();
   final dateLabel = _formatDate(saleDate);
+  final amountDue = previousBalance + totalAmount;
+  final remaining =
+      remainingAfter ?? (amountDue - paidAmount).clamp(0, double.infinity);
 
   doc.addPage(
     pw.Page(
@@ -100,12 +106,47 @@ Future<void> printBillReceipt({
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
+                pw.Text("Today's drop (Rs)"),
+                pw.Text(formatCurrency(totalAmount)),
+              ],
+            ),
+            if (previousBalance > 0)
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Previous unpaid (Rs)'),
+                  pw.Text(formatCurrency(previousBalance)),
+                ],
+              ),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
                 pw.Text(
-                  'Total (Rs)',
+                  'Total due (Rs)',
                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                 ),
                 pw.Text(
-                  formatCurrency(totalAmount),
+                  formatCurrency(amountDue),
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                ),
+              ],
+            ),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Paid (Rs)'),
+                pw.Text(formatCurrency(paidAmount)),
+              ],
+            ),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  'Remaining (Rs)',
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                ),
+                pw.Text(
+                  formatCurrency(remaining),
                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                 ),
               ],

@@ -5,6 +5,7 @@ class Shop {
   final String address;
   final String? phone;
   final String? route;
+  final String outstandingBalance;
   final bool isActive;
 
   const Shop({
@@ -14,6 +15,7 @@ class Shop {
     required this.address,
     required this.phone,
     required this.route,
+    required this.outstandingBalance,
     required this.isActive,
   });
 
@@ -25,7 +27,11 @@ class Shop {
       address: json['address'] as String,
       phone: json['phone'] as String?,
       route: json['route'] as String?,
+      outstandingBalance: json['outstandingBalance']?.toString() ?? '0.00',
       isActive: json['isActive'] as bool? ?? true,
     );
   }
+
+  double get outstandingAsDouble =>
+      double.tryParse(outstandingBalance) ?? 0;
 }

@@ -1234,6 +1234,8 @@ class _AdminShopsPageState extends State<_AdminShopsPage> {
                             [
                               if (shop.route != null && shop.route!.isNotEmpty)
                                 'Route: ${shop.route}',
+                              if (shop.outstandingAsDouble > 0)
+                                'Owes Rs ${shop.outstandingBalance}',
                               if (shop.ownerName.isNotEmpty) shop.ownerName,
                               if (shop.address.isNotEmpty) shop.address,
                               if (shop.phone != null && shop.phone!.isNotEmpty)

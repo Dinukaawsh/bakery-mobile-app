@@ -260,6 +260,16 @@ class ApiService {
     return Sale.fromJson(data['sale'] as Map<String, dynamic>);
   }
 
+  Future<Sale> settleSalePayment(int saleId, double paidAmount) async {
+    final response = await _client.patch(
+      Uri.parse('$_baseUrl/api/sales/$saleId'),
+      headers: _headers(),
+      body: jsonEncode({'paidAmount': paidAmount}),
+    );
+    final data = await _decode(response);
+    return Sale.fromJson(data['sale'] as Map<String, dynamic>);
+  }
+
   Future<DashboardStats> fetchDashboard() async {
     final response = await _client.get(
       Uri.parse('$_baseUrl/api/dashboard'),
