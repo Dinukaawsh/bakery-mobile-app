@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/locale_scope.dart';
 import '../utils/currency.dart';
 import '../utils/dates.dart';
+import '../utils/safe_insets.dart';
 import '../models/allocation.dart';
 import '../models/business_settings.dart';
 import '../models/sale.dart';
@@ -166,12 +167,15 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openCreateDelivery,
-        backgroundColor: const Color(0xFFB45309),
-        foregroundColor: Colors.white,
-        label: Text(t('delivery.titleNew')),
-        icon: const Icon(Icons.add),
+      floatingActionButton: Padding(
+        padding: EdgeInsets.only(bottom: systemBottomInset(context)),
+        child: FloatingActionButton.extended(
+          onPressed: _openCreateDelivery,
+          backgroundColor: const Color(0xFFB45309),
+          foregroundColor: Colors.white,
+          label: Text(t('delivery.titleNew')),
+          icon: const Icon(Icons.add),
+        ),
       ),
       body: Column(
         children: [
@@ -202,6 +206,9 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
               onRefresh: _load,
               child: _tab == 2
                   ? ListView(
+                      padding: EdgeInsets.only(
+                        bottom: 88 + systemBottomInset(context),
+                      ),
                       children: _allocations.isEmpty
                           ? [
                               Padding(
@@ -235,6 +242,9 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                     )
                   : _tab == 1
                       ? ListView(
+                          padding: EdgeInsets.only(
+                            bottom: 88 + systemBottomInset(context),
+                          ),
                           children: _recentDrops.isEmpty
                               ? [
                                   Padding(
@@ -294,6 +304,9 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                                   .toList(),
                         )
                       : ListView(
+                          padding: EdgeInsets.only(
+                            bottom: 88 + systemBottomInset(context),
+                          ),
                           children: _todaySales.isEmpty
                               ? [
                                   Padding(
@@ -568,7 +581,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: listPaddingWithSystemBottom(context, bottomBase: 24),
         children: [
           if (_routeOptions.isNotEmpty) ...[
             DropdownButtonFormField<String?>(

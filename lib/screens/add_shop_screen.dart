@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/locale_scope.dart';
 import '../services/api_service.dart';
+import '../utils/safe_insets.dart';
 
 class AddShopScreen extends StatefulWidget {
   const AddShopScreen({super.key, required this.apiService});
@@ -75,7 +76,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
         foregroundColor: Colors.white,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: listPaddingWithSystemBottom(context, bottomBase: 24),
         children: [
           Text(t('addShop.subtitle')),
           const SizedBox(height: 16),

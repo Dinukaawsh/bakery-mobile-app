@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/locale_scope.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../utils/safe_insets.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
   const AccountSettingsScreen({
@@ -116,7 +117,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(t('account.title'))),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: listPaddingWithSystemBottom(context, bottomBase: 24),
         children: [
           TextField(
             controller: _nameController,

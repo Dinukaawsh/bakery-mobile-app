@@ -6,6 +6,7 @@ import '../models/sale.dart';
 import '../services/api_service.dart';
 import '../utils/bill_print.dart';
 import '../utils/currency.dart';
+import '../utils/safe_insets.dart';
 import '../widgets/bill_receipt_card.dart';
 
 class BillScreen extends StatefulWidget {
@@ -226,7 +227,7 @@ class _BillScreenState extends State<BillScreen> {
                   ),
                 )
               : ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: listPaddingWithSystemBottom(context, bottomBase: 24),
                   children: [
                     BillReceiptCard(
                       settings: widget.businessSettings,

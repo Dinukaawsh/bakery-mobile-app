@@ -218,7 +218,10 @@ class _AdminShellState extends State<AdminShell> {
           ],
         ),
       ),
-      body: _buildBody(),
+      body: SafeArea(
+        top: false,
+        child: _buildBody(),
+      ),
     );
   }
 }
@@ -1258,6 +1261,7 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
                         ],
                       )
                     : ListView.builder(
+                        padding: const EdgeInsets.only(bottom: 88),
                         itemCount: _summary.length,
                         itemBuilder: (context, index) {
                           final row = _summary[index];
@@ -1313,11 +1317,13 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
               child: Center(
                 child: Card(
                   margin: const EdgeInsets.all(20),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: SingleChildScrollView(
+                  child: SafeArea(
+                    top: false,
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: SingleChildScrollView(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1427,6 +1433,7 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
               ),
             ),
           ),
+        ),
       ],
     );
   }
