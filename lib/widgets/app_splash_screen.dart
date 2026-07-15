@@ -76,13 +76,26 @@ class AppSplashScreen extends StatelessWidget {
               const Spacer(),
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
-                child: Text(
-                  'Created by DDRsolutions © $year. All rights reserved.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF78716C),
-                  ),
+                child: Column(
+                  children: [
+                    Text(
+                      'Created by DDRsolutions © $year. All rights reserved.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF78716C),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      '+94 71 8780 945',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF78716C),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:table_calendar/table_calendar.dart';
 
+import '../l10n/app_locale.dart';
 import '../l10n/locale_scope.dart';
 import '../models/admin_models.dart';
 import '../models/allocation.dart';
@@ -55,7 +57,8 @@ class _AdminShellState extends State<AdminShell> {
       ],
     ),
     _AdminSection(6, 'nav.shops', Icons.storefront_outlined),
-    _AdminSection(7, 'nav.settings', Icons.settings_outlined),
+    _AdminSection(7, 'nav.calendar', Icons.calendar_month_outlined),
+    _AdminSection(8, 'nav.settings', Icons.settings_outlined),
   ];
 
   @override
@@ -115,6 +118,11 @@ class _AdminShellState extends State<AdminShell> {
       case 6:
         return _AdminShopsPage(apiService: widget.apiService);
       case 7:
+        return _AdminCalendarPage(
+          apiService: widget.apiService,
+          businessSettings: _businessSettings,
+        );
+      case 8:
         return _AdminSettingsPage(
           apiService: widget.apiService,
           user: widget.user,
@@ -1785,6 +1793,433 @@ class _AdminShopsPageState extends State<_AdminShopsPage> {
                     },
                   ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DaySalesBucket {
+  _DaySalesBucket({
+    required this.dateKey,
+    required this.groups,
+  });
+
+  final String dateKey;
+  final List<ShopDropSummary> groups;
+
+  int get saleCount =>
+      groups.fold<int>(0, (sum, group) => sum + group.saleCount);
+
+  double get totalAmount => groups.fold<double>(
+        0,
+        (sum, group) => sum + (double.tryParse(group.totalAmount) ?? 0),
+      );
+}
+
+class _AdminCalendarPage extends StatefulWidget {
+  const _AdminCalendarPage({
+    required this.apiService,
+    required this.businessSettings,
+  });
+
+  final ApiService apiService;
+  final BusinessSettings businessSettings;
+
+  @override
+  State<_AdminCalendarPage> createState() => _AdminCalendarPageState();
+}
+
+class _AdminCalendarPageState extends State<_AdminCalendarPage> {
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
+  CalendarFormat _calendarFormat = CalendarFormat.month;
+  bool _listMode = false;
+  List<ShopDropSummary> _groups = [];
+  String? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final first = DateTime(_focusedDay.year, _focusedDay.month, 1);
+      final last = DateTime(_focusedDay.year, _focusedDay.month + 1, 0);
+      final groups = await widget.apiService.fetchShopDrops(
+        dateFrom: localDateString(first.subtract(const Duration(days: 7))),
+        dateTo: localDateString(last.add(const Duration(days: 7))),
+      );
+      if (!mounted) return;
+      setState(() {
+        _groups = groups;
+        _error = null;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Map<String, _DaySalesBucket> get _buckets {
+    final map = <String, _DaySalesBucket>{};
+    for (final group in _groups) {
+      final existing = map[group.dropDate];
+      if (existing == null) {
+        map[group.dropDate] = _DaySalesBucket(
+          dateKey: group.dropDate,
+          groups: [group],
+        );
+      } else {
+        existing.groups.add(group);
+      }
+    }
+    return map;
+  }
+
+  List<ShopDropSummary> _groupsForDay(DateTime day) {
+    return _buckets[localDateString(day)]?.groups ?? const [];
+  }
+
+  Future<void> _jumpToDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _focusedDay,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _focusedDay = picked;
+      _selectedDay = picked;
+      _listMode = false;
+      _calendarFormat = CalendarFormat.month;
+    });
+    await _load();
+    if (mounted) await _openDay(picked);
+  }
+
+  Future<void> _openDay(DateTime day) async {
+    final t = LocaleScope.of(context).t;
+    final key = localDateString(day);
+    final bucket = _buckets[key];
+    final groups = bucket?.groups ?? const <ShopDropSummary>[];
+
+    final saleId = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.75,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    key,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    groups.isEmpty
+                        ? t('admin.calendarNoSales')
+                        : '${t('admin.saleCount', {'count': bucket?.saleCount ?? 0})} · ${t('admin.calendarDayTotal')}: ${formatCurrencyFromString((bucket?.totalAmount ?? 0).toStringAsFixed(2))}',
+                    style: const TextStyle(color: Color(0xFF78716C)),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: groups.isEmpty
+                        ? Center(child: Text(t('admin.calendarNoSales')))
+                        : ListView.builder(
+                            itemCount: groups.length,
+                            itemBuilder: (context, index) {
+                              final group = groups[index];
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        group.shopName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${group.deliveryGuyName} · ${formatCurrencyFromString(group.totalAmount)}',
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        group.itemsLabel,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF57534E),
+                                        ),
+                                      ),
+                                      const Divider(),
+                                      ...group.sales.map(
+                                        (sale) => ListTile(
+                                          contentPadding: EdgeInsets.zero,
+                                          dense: true,
+                                          title: Text(
+                                            sale.saleDate.toLocal().toString(),
+                                          ),
+                                          subtitle: Text(sale.itemsLabel),
+                                          trailing: Text(
+                                            formatCurrencyFromString(
+                                              sale.totalAmount,
+                                            ),
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          onTap: () =>
+                                              Navigator.of(context).pop(sale.id),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (saleId == null || !mounted) return;
+    await showBillModal(
+      context,
+      apiService: widget.apiService,
+      saleId: saleId,
+      businessSettings: widget.businessSettings,
+    );
+    if (mounted) _load();
+  }
+
+  Widget _buildList(Map<String, _DaySalesBucket> buckets, String Function(String, [Map<String, Object?>?]) t) {
+    final days = buckets.values.toList()
+      ..sort((a, b) => b.dateKey.compareTo(a.dateKey));
+
+    if (days.isEmpty) {
+      return ListView(
+        children: [
+          const SizedBox(height: 80),
+          Center(child: Text(t('admin.calendarNoSales'))),
+        ],
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      itemCount: days.length,
+      itemBuilder: (context, index) {
+        final day = days[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ListTile(
+            title: Text(day.dateKey),
+            subtitle: Text(
+              t('admin.saleCount', {'count': day.saleCount}),
+            ),
+            trailing: Text(
+              formatCurrencyFromString(day.totalAmount.toStringAsFixed(2)),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            onTap: () => _openDay(DateTime.parse(day.dateKey)),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = LocaleScope.of(context).t;
+    final locale = LocaleScope.of(context).locale;
+    final buckets = _buckets;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: SegmentedButton<String>(
+                      segments: [
+                        ButtonSegment(
+                          value: 'month',
+                          label: Text(t('admin.calendarMonth')),
+                        ),
+                        ButtonSegment(
+                          value: 'week',
+                          label: Text(t('admin.calendarWeek')),
+                        ),
+                        ButtonSegment(
+                          value: 'list',
+                          label: Text(t('admin.calendarList')),
+                        ),
+                      ],
+                      selected: {
+                        _listMode
+                            ? 'list'
+                            : _calendarFormat == CalendarFormat.week
+                                ? 'week'
+                                : 'month',
+                      },
+                      onSelectionChanged: (value) {
+                        final next = value.first;
+                        setState(() {
+                          if (next == 'list') {
+                            _listMode = true;
+                          } else {
+                            _listMode = false;
+                            _calendarFormat = next == 'week'
+                                ? CalendarFormat.week
+                                : CalendarFormat.month;
+                          }
+                        });
+                      },
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: t('admin.calendarGoToDate'),
+                    onPressed: _jumpToDate,
+                    icon: const Icon(Icons.event),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(_error!, style: const TextStyle(color: Colors.red)),
+          ),
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        Expanded(
+          child: _listMode
+              ? _buildList(buckets, t)
+              : SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    child: TableCalendar<ShopDropSummary>(
+                      firstDay: DateTime.utc(2020, 1, 1),
+                      lastDay: DateTime.utc(2100, 12, 31),
+                      focusedDay: _focusedDay,
+                      selectedDayPredicate: (day) =>
+                          isSameDay(_selectedDay, day),
+                      calendarFormat: _calendarFormat,
+                      availableCalendarFormats: {
+                        CalendarFormat.month: t('admin.calendarMonth'),
+                        CalendarFormat.week: t('admin.calendarWeek'),
+                      },
+                      onFormatChanged: (format) {
+                        setState(() => _calendarFormat = format);
+                      },
+                      locale: locale.code == 'si' ? 'si_LK' : 'en_US',
+                      eventLoader: _groupsForDay,
+                      onDaySelected: (selected, focused) {
+                        setState(() {
+                          _selectedDay = selected;
+                          _focusedDay = focused;
+                        });
+                        _openDay(selected);
+                      },
+                      onPageChanged: (focused) {
+                        setState(() => _focusedDay = focused);
+                        _load();
+                      },
+                      calendarStyle: CalendarStyle(
+                        todayDecoration: BoxDecoration(
+                          color: const Color(0xFFFBBF24).withValues(alpha: 0.35),
+                          shape: BoxShape.circle,
+                        ),
+                        selectedDecoration: const BoxDecoration(
+                          color: Color(0xFFB45309),
+                          shape: BoxShape.circle,
+                        ),
+                        markerDecoration: const BoxDecoration(
+                          color: Color(0xFFB45309),
+                          shape: BoxShape.circle,
+                        ),
+                        outsideDaysVisible: false,
+                      ),
+                      headerStyle: const HeaderStyle(
+                        formatButtonVisible: false,
+                        titleCentered: true,
+                        titleTextStyle: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      calendarBuilders: CalendarBuilders(
+                        markerBuilder: (context, day, events) {
+                          if (events.isEmpty) return null;
+                          final key = localDateString(day);
+                          final bucket = buckets[key];
+                          if (bucket == null) return null;
+                          return Positioned(
+                            bottom: 2,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFB45309),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                formatCurrencyFromString(
+                                  bucket.totalAmount.toStringAsFixed(0),
+                                ),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
         ),
       ],
     );

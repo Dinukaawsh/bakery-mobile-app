@@ -52,6 +52,7 @@ const Map<String, String> stringsSi = {
   'nav.assignmentHistory': 'පැවරුම් ඉතිහාසය',
   'nav.shops': 'සාප්පු',
   'nav.shopDrops': 'සාප්පු බෙදාහැරීම්',
+  'nav.calendar': 'දින දර්ශනය',
   'nav.settings': 'සැකසුම්',
 
   'delivery.titleNew': 'නව බෙදාහැරීම',
@@ -202,6 +203,13 @@ const Map<String, String> stringsSi = {
   'admin.salesGroupHint':
       'මෙම සාප්පුවේ සහ දිනයේ එකතුව. බිල්පත සඳහා විකුණුමක් තට්ටු කරන්න.',
   'admin.saleCount': 'විකුණුම් {count}',
+  'admin.calendarHint': 'සාප්පු, හවුල්කරුවන් සහ බිල්පත් බැලීමට දිනයක් තට්ටු කරන්න.',
+  'admin.calendarDayTotal': 'දින මුළු එකතුව',
+  'admin.calendarNoSales': 'මෙම දිනයට විකුණුම් නැත',
+  'admin.calendarGoToDate': 'දිනයට යන්න',
+  'admin.calendarMonth': 'මාසය',
+  'admin.calendarWeek': 'සතිය',
+  'admin.calendarList': 'ලැයිස්තුව',
   'admin.noPartnersYet': 'තවම බෙදාහැරීමේ හවුල්කරුවන් නැත',
   'admin.assignmentDate': 'පැවරුම් දිනය (YYYY-MM-DD)',
   'admin.filterByPartner': 'හවුල්කරු අනුව පෙරහන්',

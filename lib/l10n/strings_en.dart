@@ -52,6 +52,7 @@ const Map<String, String> stringsEn = {
   'nav.assignmentHistory': 'Assignment History',
   'nav.shops': 'Shops',
   'nav.shopDrops': 'Shop Drops',
+  'nav.calendar': 'Calendar',
   'nav.settings': 'Settings',
 
   'delivery.titleNew': 'New delivery',
@@ -202,6 +203,13 @@ const Map<String, String> stringsEn = {
   'admin.salesGroupHint':
       'Combined total for this shop and day. Tap a sale to open its bill.',
   'admin.saleCount': '{count} sales',
+  'admin.calendarHint': 'Tap a day to see shops, partners, and bills.',
+  'admin.calendarDayTotal': 'Day total',
+  'admin.calendarNoSales': 'No sales on this day',
+  'admin.calendarGoToDate': 'Go to date',
+  'admin.calendarMonth': 'Month',
+  'admin.calendarWeek': 'Week',
+  'admin.calendarList': 'List',
   'admin.noPartnersYet': 'No delivery partners yet',
   'admin.assignmentDate': 'Assignment date (YYYY-MM-DD)',
   'admin.filterByPartner': 'Filter by partner',
