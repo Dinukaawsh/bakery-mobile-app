@@ -2,12 +2,12 @@ const Map<String, String> stringsSi = {
   'locale.en': 'EN',
   'locale.si': 'සිං',
   'locale.switchAria': 'භාෂාව මාරු කරන්න',
-
   'common.cancel': 'අවලංගු කරන්න',
   'common.confirm': 'තහවුරු කරන්න',
   'common.close': 'වසන්න',
   'common.back': 'ආපසු',
   'common.save': 'සුරකින්න',
+  'common.saveChanges': 'වෙනස්කම් සුරකින්න',
   'common.saving': 'සුරකිමින්...',
   'common.loading': 'පූරණය වෙමින්...',
   'common.logout': 'ඉවත් වන්න',
@@ -28,14 +28,12 @@ const Map<String, String> stringsSi = {
   'common.product': 'නිෂ්පාදනය',
   'common.qty': 'ප්‍රමාණය',
   'common.optional': 'විකල්ප',
-
   'splash.loading': 'පූරණය වෙමින්...',
-
   'logout.confirmTitle': 'ඉවත් වන්න',
   'logout.confirmMessage': 'ඔබට ඉවත් වීමට අවශ්‍යද?',
-
   'login.welcome': 'සාදරයෙන් පිළිගනිමු',
-  'login.subtitle': 'බෙදාහැරීම් වාර්තා කර සාප්පු බිල්පත් මුද්‍රණය කිරීමට පුරන්න.',
+  'login.subtitle':
+      'බෙදාහැරීම් වාර්තා කර සාප්පු බිල්පත් මුද්‍රණය කිරීමට පුරන්න.',
   'login.email': 'විද්‍යුත් තැපෑල',
   'login.password': 'මුරපදය',
   'login.emailRequired': 'ඔබේ විද්‍යුත් තැපෑල ඇතුළත් කරන්න',
@@ -44,7 +42,6 @@ const Map<String, String> stringsSi = {
   'login.signingIn': 'පුරනය වෙමින්...',
   'login.emailInvalid': 'වලංගු විද්‍යුත් තැපෑලක් ඇතුළත් කරන්න',
   'login.accessHint': 'බෙදාහැරීමේ හවුල්කරුවන් සහ පරිපාලක පිවිසුම',
-
   'nav.dashboard': 'මුල් පිටුව',
   'nav.products': 'නිෂ්පාදන',
   'nav.sales': 'විකුණුම්',
@@ -57,10 +54,8 @@ const Map<String, String> stringsSi = {
   'nav.notifications': 'දැනුම්දීම්',
   'nav.conversations': 'පණිවිඩ',
   'nav.settings': 'සැකසුම්',
-
   'shell.notificationsAria': 'දැනුම්දීම්',
   'shell.markAllRead': 'සියල්ල කියවූ ලෙස සලකුණු කරන්න',
-
   'comments.title': 'අදහස්',
   'comments.empty': 'තවම අදහස් නැත. පළමු අදහස ලියන්න.',
   'comments.placeholder': 'අදහසක් ලියන්න…',
@@ -69,6 +64,8 @@ const Map<String, String> stringsSi = {
   'comments.loadMore': 'තවත් අදහස් {count}ක් පෙන්වන්න',
   'comments.replyingTo': '{name} වෙත පිළිතුරු',
   'comments.deleteConfirm': 'මෙම අදහස මකන්නද?',
+  'comments.editing': 'අදහස සංස්කරණය කරමින්',
+  'comments.edited': 'සංස්කරණය කළා',
   'chat.message': 'පණිවිඩය',
   'chat.placeholder': 'පණිවිඩයක් ලියන්න…',
   'chat.emptyThread': 'තවම පණිවිඩ නැත. ආයුබෝවන් කියන්න.',
@@ -77,6 +74,13 @@ const Map<String, String> stringsSi = {
   'chat.photo': 'ඡායාරූපය',
   'chat.messageDeleted': 'මෙම පණිවිඩය මකා ඇත',
   'chat.deleteConfirm': 'මෙම පණිවිඩය මකන්නද?',
+  'chat.editing': 'පණිවිඩය සංස්කරණය කරමින්',
+  'chat.edited': 'සංස්කරණය කළා',
+  'chat.today': 'අද',
+  'chat.loadingOlder': 'පැරණි පණිවිඩ පූරණය වෙමින්…',
+  'chat.online': 'සබැඳි',
+  'chat.lastSeen': 'අවසන් වරට දුටුවේ {time}',
+  'chat.lastSeenJustNow': 'අවසන් වරට දුටුවේ දැන්',
   'chat.newMessageToast': 'නව කතාබස් පණිවිඩයක්',
   'chat.newMessagesToast': 'නව කතාබස් පණිවිඩ {count}',
   'chat.justNow': 'දැන්',
@@ -90,7 +94,6 @@ const Map<String, String> stringsSi = {
   'calls.normal': 'සාමාන්‍ය ඇමතුම',
   'calls.normalHint': 'මෙම අංකය සමඟ දුරකථන ඩයලරය විවෘත කරන්න',
   'calls.noPhone': 'මෙම හවුල්කරුට දුරකථන අංකයක් සුරැකී නැත.',
-
   'notifications.empty': 'තවම දැනුම්දීම් නැත.',
   'notifications.unread': 'නොකියවූ',
   'notifications.pageStatus': 'පිටුව {page} / {totalPages} • මුළු {total}',
@@ -98,7 +101,6 @@ const Map<String, String> stringsSi = {
   'notifications.next': 'ඊළඟ',
   'notifications.deliveryHint':
       'බෙදාහැරීමේ හවුල්කරුවන්ට තබා ගන්නේ පසුගිය දින 7ක දැනුම්දීම් පමණි.',
-
   'delivery.titleNew': 'නව බෙදාහැරීම',
   'delivery.recordDelivery': 'බෙදාහැරීම වාර්තා කරන්න',
   'delivery.today': 'අද',
@@ -116,8 +118,7 @@ const Map<String, String> stringsSi = {
       'බෙදාහැරීමේදී යෙදුම විවෘතව හෝ අවම කර තබන්න. බලෙන් වසා දැමීමෙන් ලුහුබැඳීම නවතී.',
   'delivery.locationPermissionDenied':
       'ඔබේ පිහිටීම බෙදා ගැනීමට ස්ථාන අවසරය අවශ්‍යයි.',
-  'delivery.locationDisabled':
-      'GPS / ස්ථාන සේවා සක්‍රිය කර නැවත උත්සාහ කරන්න.',
+  'delivery.locationDisabled': 'GPS / ස්ථාන සේවා සක්‍රිය කර නැවත උත්සාහ කරන්න.',
   'delivery.locationStarted': 'පිහිටීම බෙදාගැනීම ආරම්භ විය',
   'delivery.locationStopped': 'පිහිටීම බෙදාගැනීම නැවතුණි',
   'delivery.stockTodayTitle': 'අද තොගය',
@@ -131,8 +132,7 @@ const Map<String, String> stringsSi = {
   'delivery.noAssignmentsToday': 'අද නිෂ්පාදන පැවරා නැත.',
   'delivery.noSalesToday': 'අද තවම විකුණුම් වාර්තා කර නැත.',
   'delivery.noSalesHistory': 'පසුගිය දින 7 තුළ විකුණුම් නැත.',
-  'delivery.historyHint':
-      'පසුගිය දින 7ක විකුණුම් පෙන්වයි (ශ්‍රී ලංකා වේලාව).',
+  'delivery.historyHint': 'පසුගිය දින 7ක විකුණුම් පෙන්වයි (ශ්‍රී ලංකා වේලාව).',
   'delivery.visitedShops': 'සාප්පු {count}',
   'delivery.droppedQty': 'බිම දැමූ: {count}',
   'delivery.viewBill': 'බිල් බලන්න',
@@ -142,7 +142,8 @@ const Map<String, String> stringsSi = {
   'delivery.allRoutes': 'සියලු මාර්ග',
   'delivery.selectShop': 'සාප්පුව තෝරන්න',
   'delivery.addNewShop': 'නව සාප්පුව එකතු කරන්න',
-  'delivery.noShopsYet': 'සාප්පු නැත. මෙම බෙදාහැරීම වාර්තා කිරීමට සාප්පුවක් එකතු කරන්න.',
+  'delivery.noShopsYet':
+      'සාප්පු නැත. මෙම බෙදාහැරීම වාර්තා කිරීමට සාප්පුවක් එකතු කරන්න.',
   'delivery.productsToDeliver': 'බෙදාහැරීමට නිෂ්පාදන',
   'delivery.remaining': 'ඉතිරි: {count}',
   'delivery.notesOptional': 'සටහන් (විකල්ප)',
@@ -157,8 +158,7 @@ const Map<String, String> stringsSi = {
   'delivery.logoutConfirmMessage': 'ඔබට ඉවත් වීමට අවශ්‍යද?',
   'delivery.accountSettings': 'ගිණුම් සැකසුම්',
   'delivery.refreshStock': 'තොගය නැවුම් කරන්න',
-  'delivery.givenSoldLeft':
-      'දුන්: {given} • විකුණු: {sold} • ඉතිරි: {left}',
+  'delivery.givenSoldLeft': 'දුන්: {given} • විකුණු: {sold} • ඉතිරි: {left}',
   'delivery.assignedSoldLeft':
       'පැවරූ: {assigned} • විකුණු: {sold} • ඉතිරි: {left}',
   'delivery.billPrinted': 'බිල්පත මුද්‍රණය විය',
@@ -170,7 +170,6 @@ const Map<String, String> stringsSi = {
   'delivery.noStockAssignedHint':
       'අද ඔබට තොගයක් පවරා නැත. පරිපාලකගෙන් තොගය පැවරීමට ඉල්ලන්න, නැතහොත් නව පැවරුමකින් පසු නැවුම් කරන්න.',
   'delivery.noDropsPeriod': 'පසුගිය දින 7 තුළ සාප්පු බෙදාහැරීම් නැත.',
-
   'bill.title': 'බෙදාහැරීමේ බිල්පත',
   'bill.shop': 'සාප්පුව',
   'bill.delivery': 'බෙදාහැරීම',
@@ -202,7 +201,6 @@ const Map<String, String> stringsSi = {
   'bill.printAgain': 'නැවත මුද්‍රණය',
   'bill.printForShop': 'සාප්පුව සඳහා බිල්පත මුද්‍රණය',
   'bill.done': 'අවසන්',
-
   'addShop.title': 'සාප්පුව එකතු කරන්න',
   'addShop.shopName': 'සාප්පු නම',
   'addShop.ownerName': 'හිමිකරුගේ නම',
@@ -220,7 +218,6 @@ const Map<String, String> stringsSi = {
   'addShop.requiredFields': 'සාප්පු නම, හිමිකරු සහ ලිපිනය අවශ්‍යයි',
   'addShop.subtitle':
       'ඔබේ මාර්ගයේ නව සාප්පුවක් එකතු කරන්න. එය බෙදාහැරීම් සහ පරිපාලක පැනලයේ පෙනෙනු ඇත.',
-
   'account.title': 'ගිණුම් සැකසුම්',
   'account.name': 'නම',
   'account.email': 'විද්‍යුත් තැපෑල',
@@ -242,13 +239,11 @@ const Map<String, String> stringsSi = {
       'විද්‍යුත් තැපෑල හෝ මුරපදය වෙනස් කරන විට වත්මන් මුරපදය ඇතුළත් කරන්න.',
   'account.currentPasswordRequired':
       'විද්‍යුත් තැපෑල හෝ මුරපදය වෙනස් කිරීමට වත්මන් මුරපදය ඇතුළත් කරන්න',
-
   'auth.suspendedTitle': 'ගිණුම අත්හිටුවා ඇත',
   'auth.suspendedMessage':
       'ඔබේ ගිණුම දැනට අත්හිටුවා ඇත. කරුණාකර බේකරි පරිපාලක අමතන්න.',
   'auth.backToLogin': 'පිවිසුමට ආපසු',
   'auth.loginSuspended': 'ඔබේ ගිණුම දැනට අත්හිටුවා ඇත.',
-
   'admin.products': 'නිෂ්පාදන',
   'admin.shops': 'සාප්පු',
   'admin.sales': 'විකුණුම්',
@@ -291,7 +286,8 @@ const Map<String, String> stringsSi = {
   'admin.salesGroupHint':
       'මෙම සාප්පුවේ සහ දිනයේ එකතුව. බිල්පත සඳහා විකුණුමක් තට්ටු කරන්න.',
   'admin.saleCount': 'විකුණුම් {count}',
-  'admin.calendarHint': 'සාප්පු, හවුල්කරුවන් සහ බිල්පත් බැලීමට දිනයක් තට්ටු කරන්න.',
+  'admin.calendarHint':
+      'සාප්පු, හවුල්කරුවන් සහ බිල්පත් බැලීමට දිනයක් තට්ටු කරන්න.',
   'admin.calendarDayTotal': 'දින මුළු එකතුව',
   'admin.calendarNoSales': 'මෙම දිනයට විකුණුම් නැත',
   'admin.calendarGoToDate': 'දිනයට යන්න',

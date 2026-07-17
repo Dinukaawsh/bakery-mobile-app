@@ -2,12 +2,12 @@ const Map<String, String> stringsEn = {
   'locale.en': 'EN',
   'locale.si': 'සිං',
   'locale.switchAria': 'Switch language',
-
   'common.cancel': 'Cancel',
   'common.confirm': 'Confirm',
   'common.close': 'Close',
   'common.back': 'Back',
   'common.save': 'Save',
+  'common.saveChanges': 'Save changes',
   'common.saving': 'Saving...',
   'common.loading': 'Loading...',
   'common.logout': 'Logout',
@@ -28,12 +28,9 @@ const Map<String, String> stringsEn = {
   'common.product': 'Product',
   'common.qty': 'Qty',
   'common.optional': 'Optional',
-
   'splash.loading': 'Loading...',
-
   'logout.confirmTitle': 'Logout',
   'logout.confirmMessage': 'Are you sure you want to logout?',
-
   'login.welcome': 'Welcome',
   'login.subtitle': 'Sign in to record deliveries and print shop bills.',
   'login.email': 'Email',
@@ -44,7 +41,6 @@ const Map<String, String> stringsEn = {
   'login.signingIn': 'Signing in...',
   'login.emailInvalid': 'Enter a valid email',
   'login.accessHint': 'Delivery partners & admin access',
-
   'nav.dashboard': 'Dashboard',
   'nav.products': 'Products',
   'nav.sales': 'Sales',
@@ -57,10 +53,8 @@ const Map<String, String> stringsEn = {
   'nav.notifications': 'Notifications',
   'nav.conversations': 'Messages',
   'nav.settings': 'Settings',
-
   'shell.notificationsAria': 'Notifications',
   'shell.markAllRead': 'Mark all read',
-
   'comments.title': 'Comments',
   'comments.empty': 'No comments yet. Leave the first one.',
   'comments.placeholder': 'Write a comment…',
@@ -69,6 +63,8 @@ const Map<String, String> stringsEn = {
   'comments.loadMore': 'Load {count} more comments',
   'comments.replyingTo': 'Replying to {name}',
   'comments.deleteConfirm': 'Delete this comment?',
+  'comments.editing': 'Editing comment',
+  'comments.edited': 'edited',
   'chat.message': 'Message',
   'chat.placeholder': 'Type a message…',
   'chat.emptyThread': 'No messages yet. Say hello.',
@@ -77,6 +73,13 @@ const Map<String, String> stringsEn = {
   'chat.photo': 'Photo',
   'chat.messageDeleted': 'This message was deleted',
   'chat.deleteConfirm': 'Delete this message?',
+  'chat.editing': 'Editing message',
+  'chat.edited': 'edited',
+  'chat.today': 'Today',
+  'chat.loadingOlder': 'Loading older messages…',
+  'chat.online': 'Online',
+  'chat.lastSeen': 'Last seen {time}',
+  'chat.lastSeenJustNow': 'Last seen just now',
   'chat.newMessageToast': 'New chat message',
   'chat.newMessagesToast': '{count} new chat messages',
   'chat.justNow': 'just now',
@@ -90,7 +93,6 @@ const Map<String, String> stringsEn = {
   'calls.normal': 'Normal call',
   'calls.normalHint': 'Open the phone dialer with this number',
   'calls.noPhone': 'No phone number is saved for this partner.',
-
   'notifications.empty': 'No notifications yet.',
   'notifications.unread': 'Unread',
   'notifications.pageStatus': 'Page {page} of {totalPages} • {total} total',
@@ -98,7 +100,6 @@ const Map<String, String> stringsEn = {
   'notifications.next': 'Next',
   'notifications.deliveryHint':
       'Only the last 7 days of notifications are kept for delivery partners.',
-
   'delivery.titleNew': 'New delivery',
   'delivery.recordDelivery': 'Record delivery',
   'delivery.today': 'Today',
@@ -157,8 +158,7 @@ const Map<String, String> stringsEn = {
   'delivery.logoutConfirmMessage': 'Are you sure you want to logout?',
   'delivery.accountSettings': 'Account settings',
   'delivery.refreshStock': 'Refresh stock',
-  'delivery.givenSoldLeft':
-      'Given: {given} • Sold: {sold} • Left: {left}',
+  'delivery.givenSoldLeft': 'Given: {given} • Sold: {sold} • Left: {left}',
   'delivery.assignedSoldLeft':
       'Assigned: {assigned} • Sold: {sold} • Left: {left}',
   'delivery.billPrinted': 'Bill printed',
@@ -170,7 +170,6 @@ const Map<String, String> stringsEn = {
   'delivery.noStockAssignedHint':
       'No stock assigned to you today. Ask admin to assign stock, or tap refresh after a new assignment.',
   'delivery.noDropsPeriod': 'No shop drops in the last 7 days.',
-
   'bill.title': 'Delivery bill',
   'bill.shop': 'Shop',
   'bill.delivery': 'Delivery',
@@ -202,7 +201,6 @@ const Map<String, String> stringsEn = {
   'bill.printAgain': 'Print again',
   'bill.printForShop': 'Print bill for shop',
   'bill.done': 'Done',
-
   'addShop.title': 'Add shop',
   'addShop.shopName': 'Shop name',
   'addShop.ownerName': 'Owner name',
@@ -220,7 +218,6 @@ const Map<String, String> stringsEn = {
   'addShop.requiredFields': 'Shop name, owner, and address are required',
   'addShop.subtitle':
       'Add a new shop on your route. It will appear for deliveries and in the admin panel.',
-
   'account.title': 'Account settings',
   'account.name': 'Name',
   'account.email': 'Email',
@@ -242,13 +239,11 @@ const Map<String, String> stringsEn = {
       'Enter current password when changing email or password.',
   'account.currentPasswordRequired':
       'Enter current password to change email or password',
-
   'auth.suspendedTitle': 'Account suspended',
   'auth.suspendedMessage':
       'Your account is currently suspended. Please contact your bakery admin.',
   'auth.backToLogin': 'Back to login',
   'auth.loginSuspended': 'Your account is currently suspended.',
-
   'admin.products': 'Products',
   'admin.shops': 'Shops',
   'admin.sales': 'Sales',

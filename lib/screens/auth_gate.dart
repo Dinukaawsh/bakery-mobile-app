@@ -28,6 +28,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   bool _splashDone = false;
   bool _suspended = false;
   Timer? _sessionTimer;
+  Timer? _presenceTimer;
 
   @override
   void initState() {
@@ -40,6 +41,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   @override
   void dispose() {
     _sessionTimer?.cancel();
+    _presenceTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     if (widget.apiService.onAccountSuspended == _handleSuspended) {
       widget.apiService.onAccountSuspended = null;
@@ -51,6 +53,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _user != null && !_suspended) {
       unawaited(_checkSession());
+      unawaited(_pingPresence());
     }
   }
 
@@ -61,6 +64,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       _suspended = true;
     });
     _sessionTimer?.cancel();
+    _presenceTimer?.cancel();
   }
 
   Future<void> _start() async {
@@ -83,6 +87,25 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       const Duration(seconds: 45),
       (_) => unawaited(_checkSession()),
     );
+    _startPresenceWatch();
+  }
+
+  void _startPresenceWatch() {
+    _presenceTimer?.cancel();
+    unawaited(_pingPresence());
+    _presenceTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => unawaited(_pingPresence()),
+    );
+  }
+
+  Future<void> _pingPresence() async {
+    if (_user == null || _suspended) return;
+    try {
+      await widget.apiService.pingPresence();
+    } catch (_) {
+      // Ignore transient presence errors.
+    }
   }
 
   Future<void> _checkSession() async {
@@ -159,6 +182,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   Future<void> _handleLogout() async {
     _sessionTimer?.cancel();
+    _presenceTimer?.cancel();
     await widget.apiService.logout();
     if (!mounted) return;
     setState(() {

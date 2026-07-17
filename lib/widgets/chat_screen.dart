@@ -17,6 +17,8 @@ class ChatScreen extends StatefulWidget {
     required this.title,
     this.imageUrl,
     this.phone,
+    this.isOnline = false,
+    this.lastSeenAt,
   });
 
   final ApiService apiService;
@@ -24,6 +26,8 @@ class ChatScreen extends StatefulWidget {
   final String title;
   final String? imageUrl;
   final String? phone;
+  final bool isOnline;
+  final String? lastSeenAt;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -37,6 +41,9 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _loading = true;
   bool _sending = false;
   bool _uploading = false;
+  bool _loadingOlder = false;
+  bool _hasMoreOlder = false;
+  bool _stickToBottom = true;
   String? _pendingImage;
   int? _editingId;
   final _editDraft = TextEditingController();
@@ -45,31 +52,82 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
-    _poll =
-        Timer.periodic(const Duration(seconds: 3), (_) => _load(silent: true));
+    _scroll.addListener(_onScroll);
+    _loadInitial();
+    _poll = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => _pollNewMessages(),
+    );
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    _scroll.removeListener(_onScroll);
     _draft.dispose();
     _editDraft.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
-  Future<void> _load({bool silent = false}) async {
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    _stickToBottom = position.pixels >= position.maxScrollExtent - 80;
+    if (position.pixels <= 80) {
+      unawaited(_loadOlder());
+    }
+  }
+
+  Future<void> _loadInitial() async {
     try {
       final data = await widget.apiService.fetchChatMessages(
         widget.deliveryGuyId,
       );
       if (!mounted) return;
       setState(() {
-        _messages = data;
+        _messages = data.messages;
+        _hasMoreOlder = data.hasMore;
         _loading = false;
+        _stickToBottom = true;
       });
-      if (!silent) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scroll.hasClients) {
+          _scroll.jumpTo(_scroll.position.maxScrollExtent);
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _pollNewMessages() async {
+    if (_loading || _loadingOlder) return;
+    try {
+      if (_messages.isEmpty) {
+        final data = await widget.apiService.fetchChatMessages(
+          widget.deliveryGuyId,
+        );
+        if (!mounted || data.messages.isEmpty) return;
+        setState(() {
+          _messages = data.messages;
+          _hasMoreOlder = data.hasMore;
+        });
+        return;
+      }
+      final afterId = _messages.last['id'] as int?;
+      final data = await widget.apiService.fetchChatMessages(
+        widget.deliveryGuyId,
+        afterId: afterId,
+      );
+      if (!mounted || data.messages.isEmpty) return;
+      final known = _messages.map((m) => m['id']).toSet();
+      final incoming =
+          data.messages.where((m) => !known.contains(m['id'])).toList();
+      if (incoming.isEmpty) return;
+      setState(() => _messages = [..._messages, ...incoming]);
+      if (_stickToBottom) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_scroll.hasClients) {
             _scroll.jumpTo(_scroll.position.maxScrollExtent);
@@ -77,8 +135,42 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
     } catch (_) {
+      // Ignore transient poll errors.
+    }
+  }
+
+  Future<void> _loadOlder() async {
+    if (_loadingOlder || !_hasMoreOlder || _messages.isEmpty) return;
+    final oldestId = _messages.first['id'] as int?;
+    if (oldestId == null) return;
+
+    final previousPixels = _scroll.hasClients ? _scroll.position.pixels : 0.0;
+    final previousMax =
+        _scroll.hasClients ? _scroll.position.maxScrollExtent : 0.0;
+
+    setState(() => _loadingOlder = true);
+    try {
+      final data = await widget.apiService.fetchChatMessages(
+        widget.deliveryGuyId,
+        beforeId: oldestId,
+      );
       if (!mounted) return;
-      if (!silent) setState(() => _loading = false);
+      final known = _messages.map((m) => m['id']).toSet();
+      final older =
+          data.messages.where((m) => !known.contains(m['id'])).toList();
+      setState(() {
+        _messages = [...older, ..._messages];
+        _hasMoreOlder = data.hasMore;
+        _loadingOlder = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scroll.hasClients) return;
+        final delta = _scroll.position.maxScrollExtent - previousMax;
+        _scroll.jumpTo(previousPixels + delta);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingOlder = false);
     }
   }
 
@@ -125,8 +217,14 @@ class _ChatScreenState extends State<ChatScreen> {
         _draft.clear();
         _pendingImage = null;
         _sending = false;
+        _stickToBottom = true;
       });
-      await _load();
+      await _pollNewMessages();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scroll.hasClients) {
+          _scroll.jumpTo(_scroll.position.maxScrollExtent);
+        }
+      });
     } catch (error) {
       if (!mounted) return;
       setState(() => _sending = false);
@@ -150,6 +248,7 @@ class _ChatScreenState extends State<ChatScreen> {
             .map((m) => m['id'] == id ? {...m, ...updated} : m)
             .toList();
         _editingId = null;
+        _editDraft.clear();
       });
     } catch (error) {
       if (!mounted) return;
@@ -188,7 +287,7 @@ class _ChatScreenState extends State<ChatScreen> {
               .toList();
         });
       } else {
-        await _load(silent: true);
+        await _loadInitial();
       }
     } catch (error) {
       if (!mounted) return;
@@ -281,6 +380,20 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  String _presenceLabel({
+    required bool isOnline,
+    String? lastSeenAt,
+  }) {
+    final t = LocaleScope.of(context).t;
+    if (isOnline) return t('chat.online');
+    if (lastSeenAt == null || lastSeenAt.isEmpty) return '';
+    final date = DateTime.tryParse(lastSeenAt);
+    if (date == null) return '';
+    final difference = DateTime.now().toUtc().difference(date.toUtc());
+    if (difference.inMinutes < 1) return t('chat.lastSeenJustNow');
+    return t('chat.lastSeen', {'time': _timeAgo(lastSeenAt)});
+  }
+
   String _timeAgo(String? iso) {
     final t = LocaleScope.of(context).t;
     if (iso == null) return '';
@@ -301,6 +414,42 @@ class _ChatScreenState extends State<ChatScreen> {
         '${date.day.toString().padLeft(2, '0')}';
   }
 
+  DateTime? _messageDay(String? iso) {
+    final parsed = iso == null ? null : DateTime.tryParse(iso);
+    if (parsed == null) return null;
+    final local = parsed.toLocal();
+    return DateTime(local.year, local.month, local.day);
+  }
+
+  Widget _dateSeparator(DateTime day) {
+    final t = LocaleScope.of(context).t;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final label = day == today
+        ? t('chat.today')
+        : MaterialLocalizations.of(context).formatMediumDate(day);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          const Expanded(child: Divider(color: Color(0xFFFCD34D))),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF78716C),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const Expanded(child: Divider(color: Color(0xFFFCD34D))),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = LocaleScope.of(context).t;
@@ -314,7 +463,30 @@ class _ChatScreenState extends State<ChatScreen> {
             _avatar(widget.title, widget.imageUrl),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(widget.title, overflow: TextOverflow.ellipsis),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.title, overflow: TextOverflow.ellipsis),
+                  if (_presenceLabel(
+                    isOnline: widget.isOnline,
+                    lastSeenAt: widget.lastSeenAt,
+                  ).isNotEmpty)
+                    Text(
+                      _presenceLabel(
+                        isOnline: widget.isOnline,
+                        lastSeenAt: widget.lastSeenAt,
+                      ),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: widget.isOnline
+                            ? const Color(0xFFBBF7D0)
+                            : const Color(0xFFFDE68A),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
             ),
           ],
         ),
@@ -341,9 +513,25 @@ class _ChatScreenState extends State<ChatScreen> {
                     : ListView.builder(
                         controller: _scroll,
                         padding: const EdgeInsets.all(12),
-                        itemCount: _messages.length,
+                        itemCount: _messages.length + (_loadingOlder ? 1 : 0),
                         itemBuilder: (context, index) {
-                          final msg = _messages[index];
+                          if (_loadingOlder && index == 0) {
+                            return const Padding(
+                              padding: EdgeInsets.only(bottom: 10),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                          final messageIndex =
+                              _loadingOlder ? index - 1 : index;
+                          final msg = _messages[messageIndex];
                           final mine = msg['mine'] == true;
                           final deleted = msg['isDeleted'] == true;
                           final name = msg['senderName'] as String? ?? '';
@@ -352,175 +540,253 @@ class _ChatScreenState extends State<ChatScreen> {
                           final photo = msg['imageUrl'] as String?;
                           final createdAt = msg['createdAt'] as String?;
                           final editing = _editingId == msg['id'];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Row(
-                              mainAxisAlignment: mine
-                                  ? MainAxisAlignment.end
-                                  : MainAxisAlignment.start,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                if (!mine) ...[
-                                  _avatar(name, imageUrl),
-                                  const SizedBox(width: 8),
-                                ],
-                                Flexible(
-                                  child: GestureDetector(
-                                    onLongPress: mine && !deleted && !editing
-                                        ? () => _showMessageActions(msg)
-                                        : null,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 10,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: deleted
-                                            ? const Color(0xFFF5F5F4)
-                                            : mine
-                                                ? const Color(0xFFB45309)
-                                                : Colors.white,
-                                        borderRadius: BorderRadius.only(
-                                          topLeft: const Radius.circular(16),
-                                          topRight: const Radius.circular(16),
-                                          bottomLeft:
-                                              Radius.circular(mine ? 16 : 4),
-                                          bottomRight:
-                                              Radius.circular(mine ? 4 : 16),
-                                        ),
-                                        border: mine && !deleted
-                                            ? null
-                                            : Border.all(
-                                                color: const Color(0xFFE7E5E4),
-                                              ),
-                                      ),
-                                      child: editing
-                                          ? Column(
-                                              children: [
-                                                TextField(
-                                                  controller: _editDraft,
-                                                  maxLines: 3,
-                                                  style: const TextStyle(
-                                                    color: Colors.black,
+                          final day = _messageDay(createdAt);
+                          final previousDay = messageIndex > 0
+                              ? _messageDay(
+                                  _messages[messageIndex - 1]['createdAt']
+                                      as String?,
+                                )
+                              : null;
+                          final startsDate = day != null && day != previousDay;
+                          return Column(
+                            children: [
+                              if (startsDate) _dateSeparator(day),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: Row(
+                                  mainAxisAlignment: mine
+                                      ? MainAxisAlignment.end
+                                      : MainAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    if (!mine) ...[
+                                      _avatar(name, imageUrl),
+                                      const SizedBox(width: 8),
+                                    ],
+                                    Flexible(
+                                      child: GestureDetector(
+                                        onLongPress:
+                                            mine && !deleted && !editing
+                                                ? () => _showMessageActions(msg)
+                                                : null,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 10,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: deleted
+                                                ? const Color(0xFFF5F5F4)
+                                                : mine
+                                                    ? const Color(0xFFB45309)
+                                                    : Colors.white,
+                                            borderRadius: BorderRadius.only(
+                                              topLeft:
+                                                  const Radius.circular(16),
+                                              topRight:
+                                                  const Radius.circular(16),
+                                              bottomLeft: Radius.circular(
+                                                  mine ? 16 : 4),
+                                              bottomRight: Radius.circular(
+                                                  mine ? 4 : 16),
+                                            ),
+                                            border: mine && !deleted
+                                                ? null
+                                                : Border.all(
+                                                    color:
+                                                        const Color(0xFFE7E5E4),
                                                   ),
-                                                  decoration:
-                                                      const InputDecoration(
-                                                    filled: true,
-                                                    fillColor: Colors.white,
-                                                    border:
-                                                        OutlineInputBorder(),
-                                                    isDense: true,
-                                                  ),
-                                                ),
-                                                Row(
+                                          ),
+                                          child: editing
+                                              ? Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
                                                   children: [
-                                                    TextButton(
-                                                      onPressed: () =>
-                                                          _saveEdit(
-                                                        msg['id'] as int,
-                                                      ),
-                                                      child: Text(
-                                                        t('common.saveChanges'),
+                                                    Text(
+                                                      t('chat.editing'),
+                                                      style: const TextStyle(
+                                                        color:
+                                                            Color(0xFF92400E),
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.w700,
                                                       ),
                                                     ),
-                                                    TextButton(
-                                                      onPressed: () => setState(
-                                                        () => _editingId = null,
+                                                    const SizedBox(height: 6),
+                                                    TextField(
+                                                      controller: _editDraft,
+                                                      maxLines: 3,
+                                                      style: const TextStyle(
+                                                        color: Colors.black,
                                                       ),
-                                                      child: Text(
-                                                          t('common.cancel')),
+                                                      decoration:
+                                                          const InputDecoration(
+                                                        filled: true,
+                                                        fillColor: Colors.white,
+                                                        border:
+                                                            OutlineInputBorder(),
+                                                        isDense: true,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 8),
+                                                    Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment.end,
+                                                      children: [
+                                                        OutlinedButton(
+                                                          onPressed: () =>
+                                                              setState(() {
+                                                            _editingId = null;
+                                                            _editDraft.clear();
+                                                          }),
+                                                          child: Text(
+                                                            t('common.cancel'),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                            width: 8),
+                                                        FilledButton.icon(
+                                                          onPressed: () =>
+                                                              _saveEdit(
+                                                            msg['id'] as int,
+                                                          ),
+                                                          style: FilledButton
+                                                              .styleFrom(
+                                                            backgroundColor:
+                                                                const Color(
+                                                              0xFFB45309,
+                                                            ),
+                                                            foregroundColor:
+                                                                Colors.white,
+                                                          ),
+                                                          icon: const Icon(
+                                                            Icons.check,
+                                                            size: 18,
+                                                          ),
+                                                          label: Text(
+                                                            t('common.saveChanges'),
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
                                                   ],
-                                                ),
-                                              ],
-                                            )
-                                          : Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                if (!mine && !deleted)
-                                                  Text(
-                                                    name,
-                                                    style: const TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      color: Color(0xFF78716C),
-                                                    ),
-                                                  ),
-                                                if (deleted)
-                                                  Text(
-                                                    t('chat.messageDeleted'),
-                                                    style: TextStyle(
-                                                      fontStyle:
-                                                          FontStyle.italic,
-                                                      color: mine
-                                                          ? Colors.white70
-                                                          : const Color(
-                                                              0xFF78716C,
+                                                )
+                                              : Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    if (!mine && !deleted)
+                                                      Text(
+                                                        name,
+                                                        style: const TextStyle(
+                                                          fontSize: 11,
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                          color:
+                                                              Color(0xFF78716C),
+                                                        ),
+                                                      ),
+                                                    if (deleted)
+                                                      Text(
+                                                        t('chat.messageDeleted'),
+                                                        style: TextStyle(
+                                                          fontStyle:
+                                                              FontStyle.italic,
+                                                          color: mine
+                                                              ? Colors.white70
+                                                              : const Color(
+                                                                  0xFF78716C,
+                                                                ),
+                                                        ),
+                                                      )
+                                                    else ...[
+                                                      if (photo != null &&
+                                                          photo
+                                                              .trim()
+                                                              .isNotEmpty)
+                                                        Padding(
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .only(
+                                                            bottom: 6,
+                                                          ),
+                                                          child: ClipRRect(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                              10,
                                                             ),
-                                                    ),
-                                                  )
-                                                else ...[
-                                                  if (photo != null &&
-                                                      photo.trim().isNotEmpty)
-                                                    Padding(
-                                                      padding:
-                                                          const EdgeInsets.only(
-                                                        bottom: 6,
-                                                      ),
-                                                      child: ClipRRect(
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(
-                                                          10,
+                                                            child:
+                                                                Image.network(
+                                                              photo.trim(),
+                                                              height: 180,
+                                                              width: double
+                                                                  .infinity,
+                                                              fit: BoxFit.cover,
+                                                            ),
+                                                          ),
                                                         ),
-                                                        child: Image.network(
-                                                          photo.trim(),
-                                                          height: 180,
-                                                          width:
-                                                              double.infinity,
-                                                          fit: BoxFit.cover,
+                                                      if (body.isNotEmpty)
+                                                        Text(
+                                                          body,
+                                                          style: TextStyle(
+                                                            color: mine
+                                                                ? Colors.white
+                                                                : const Color(
+                                                                    0xFF1C1917,
+                                                                  ),
+                                                          ),
+                                                        ),
+                                                    ],
+                                                    if (createdAt != null ||
+                                                        (msg['editedAt'] !=
+                                                                null &&
+                                                            !deleted))
+                                                      Padding(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .only(
+                                                          top: 4,
+                                                        ),
+                                                        child: DefaultTextStyle(
+                                                          style: TextStyle(
+                                                            fontSize: 10,
+                                                            color: mine &&
+                                                                    !deleted
+                                                                ? Colors.white70
+                                                                : const Color(
+                                                                    0xFFA8A29E,
+                                                                  ),
+                                                          ),
+                                                          child: Wrap(
+                                                            spacing: 6,
+                                                            children: [
+                                                              if (createdAt !=
+                                                                  null)
+                                                                Text(
+                                                                  _timeAgo(
+                                                                    createdAt,
+                                                                  ),
+                                                                ),
+                                                              if (msg['editedAt'] !=
+                                                                      null &&
+                                                                  !deleted)
+                                                                Text(
+                                                                  t('chat.edited'),
+                                                                ),
+                                                            ],
+                                                          ),
                                                         ),
                                                       ),
-                                                    ),
-                                                  if (body.isNotEmpty)
-                                                    Text(
-                                                      body,
-                                                      style: TextStyle(
-                                                        color: mine
-                                                            ? Colors.white
-                                                            : const Color(
-                                                                0xFF1C1917,
-                                                              ),
-                                                      ),
-                                                    ),
-                                                ],
-                                                if (createdAt != null)
-                                                  Padding(
-                                                    padding:
-                                                        const EdgeInsets.only(
-                                                      top: 4,
-                                                    ),
-                                                    child: Text(
-                                                      _timeAgo(createdAt),
-                                                      style: TextStyle(
-                                                        fontSize: 10,
-                                                        color: mine && !deleted
-                                                            ? Colors.white70
-                                                            : const Color(
-                                                                0xFFA8A29E,
-                                                              ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
+                                                  ],
+                                                ),
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           );
                         },
                       ),
@@ -536,7 +802,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               child: Column(
                 children: [
-                  if (_pendingImage != null)
+                  if (_editingId == null && _pendingImage != null)
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Stack(
@@ -562,46 +828,47 @@ class _ChatScreenState extends State<ChatScreen> {
                         ],
                       ),
                     ),
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: _uploading || _sending ? null : _pickImage,
-                        icon: _uploading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.photo_outlined),
-                        color: const Color(0xFFB45309),
-                      ),
-                      Expanded(
-                        child: TextField(
-                          controller: _draft,
-                          minLines: 1,
-                          maxLines: 4,
-                          decoration: InputDecoration(
-                            hintText: t('chat.placeholder'),
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
+                  if (_editingId == null)
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: _uploading || _sending ? null : _pickImage,
+                          icon: _uploading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.photo_outlined),
+                          color: const Color(0xFFB45309),
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: _draft,
+                            minLines: 1,
+                            maxLines: 4,
+                            decoration: InputDecoration(
+                              hintText: t('chat.placeholder'),
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton.filled(
-                        onPressed: _sending || _uploading ? null : _send,
-                        style: IconButton.styleFrom(
-                          backgroundColor: const Color(0xFFB45309),
-                          foregroundColor: Colors.white,
+                        const SizedBox(width: 8),
+                        IconButton.filled(
+                          onPressed: _sending || _uploading ? null : _send,
+                          style: IconButton.styleFrom(
+                            backgroundColor: const Color(0xFFB45309),
+                            foregroundColor: Colors.white,
+                          ),
+                          icon: const Icon(Icons.send),
                         ),
-                        icon: const Icon(Icons.send),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -707,6 +974,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
             'deliveryGuyPhone': partner.phone,
             'lastMessage': null,
             'unreadCount': 0,
+            'isOnline': false,
+            'lastSeenAt': null,
           };
         }
       }
@@ -742,6 +1011,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
           title: item['deliveryGuyName'] as String? ?? 'Chat',
           imageUrl: item['deliveryGuyImageUrl'] as String?,
           phone: item['deliveryGuyPhone'] as String?,
+          isOnline: item['isOnline'] == true,
+          lastSeenAt: item['lastSeenAt'] as String?,
         ),
       ),
     );
@@ -764,36 +1035,98 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         final name = item['deliveryGuyName'] as String? ?? '';
         final unread = (item['unreadCount'] as num?)?.toInt() ?? 0;
         final imageUrl = item['deliveryGuyImageUrl'] as String?;
+        final online = item['isOnline'] == true;
+        final lastSeenAt = item['lastSeenAt'] as String?;
+        String presence = '';
+        if (online) {
+          presence = t('chat.online');
+        } else if (lastSeenAt != null && lastSeenAt.isNotEmpty) {
+          final date = DateTime.tryParse(lastSeenAt);
+          if (date != null) {
+            final difference =
+                DateTime.now().toUtc().difference(date.toUtc());
+            if (difference.inMinutes < 1) {
+              presence = t('chat.lastSeenJustNow');
+            } else if (difference.inHours < 1) {
+              presence = t('chat.lastSeen', {
+                'time': t('chat.minutesAgo', {'count': difference.inMinutes}),
+              });
+            } else if (difference.inDays < 1) {
+              presence = t('chat.lastSeen', {
+                'time': t('chat.hoursAgo', {'count': difference.inHours}),
+              });
+            } else {
+              presence = t('chat.lastSeen', {
+                'time': t('chat.daysAgo', {'count': difference.inDays}),
+              });
+            }
+          }
+        }
         return ListTile(
           tileColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
             side: const BorderSide(color: Color(0xFFFDE68A)),
           ),
-          leading: CircleAvatar(
-            backgroundColor: const Color(0xFFFDE68A),
-            backgroundImage: imageUrl != null && imageUrl.trim().isNotEmpty
-                ? NetworkImage(imageUrl.trim())
-                : null,
-            child: imageUrl == null || imageUrl.trim().isEmpty
-                ? Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      color: Color(0xFF92400E),
-                      fontWeight: FontWeight.w800,
+          leading: Stack(
+            children: [
+              CircleAvatar(
+                backgroundColor: const Color(0xFFFDE68A),
+                backgroundImage: imageUrl != null && imageUrl.trim().isNotEmpty
+                    ? NetworkImage(imageUrl.trim())
+                    : null,
+                child: imageUrl == null || imageUrl.trim().isEmpty
+                    ? Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: const TextStyle(
+                          color: Color(0xFF92400E),
+                          fontWeight: FontWeight.w800,
+                        ),
+                      )
+                    : null,
+              ),
+              if (online)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF16A34A),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
                     ),
-                  )
-                : null,
+                  ),
+                ),
+            ],
           ),
           title: Text(
             name,
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
-          subtitle: Text(
-            _preview(item, t),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _preview(item, t),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (presence.isNotEmpty)
+                Text(
+                  presence,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: online
+                        ? const Color(0xFF16A34A)
+                        : const Color(0xFFA8A29E),
+                  ),
+                ),
+            ],
           ),
+          isThreeLine: presence.isNotEmpty,
           trailing: unread > 0
               ? CircleAvatar(
                   radius: 12,

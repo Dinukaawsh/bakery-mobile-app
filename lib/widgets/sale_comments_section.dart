@@ -98,6 +98,7 @@ class _SaleCommentsSectionState extends State<SaleCommentsSection> {
       setState(() {
         _comments = next;
         _editingId = null;
+        _editDraft.clear();
         _saving = false;
       });
     } catch (error) {
@@ -269,7 +270,17 @@ class _SaleCommentsSectionState extends State<SaleCommentsSection> {
                     ),
                     child: editing
                         ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              Text(
+                                t('comments.editing'),
+                                style: const TextStyle(
+                                  color: Color(0xFF92400E),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
                               TextField(
                                 controller: _editDraft,
                                 maxLines: 3,
@@ -286,8 +297,10 @@ class _SaleCommentsSectionState extends State<SaleCommentsSection> {
                                     child: Text(t('common.saveChanges')),
                                   ),
                                   TextButton(
-                                    onPressed: () =>
-                                        setState(() => _editingId = null),
+                                    onPressed: () => setState(() {
+                                      _editingId = null;
+                                      _editDraft.clear();
+                                    }),
                                     child: Text(t('common.cancel')),
                                   ),
                                 ],
@@ -306,6 +319,17 @@ class _SaleCommentsSectionState extends State<SaleCommentsSection> {
                               ),
                               const SizedBox(height: 4),
                               Text(body),
+                              if (comment['isEdited'] == true)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 3),
+                                  child: Text(
+                                    t('comments.edited'),
+                                    style: const TextStyle(
+                                      color: Color(0xFFA8A29E),
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
                   ),

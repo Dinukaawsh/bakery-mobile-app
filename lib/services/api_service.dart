@@ -546,6 +546,14 @@ class ApiService {
     return await _decode(response);
   }
 
+  Future<void> pingPresence() async {
+    final response = await _client.post(
+      Uri.parse('$_baseUrl/api/presence'),
+      headers: _headers(),
+    );
+    await _decode(response);
+  }
+
   Future<int> fetchChatUnreadCount() async {
     final response = await _client.get(
       Uri.parse('$_baseUrl/api/conversations?unreadOnly=true'),
@@ -555,20 +563,29 @@ class ApiService {
     return (data['unreadCount'] as num?)?.toInt() ?? 0;
   }
 
-  Future<List<Map<String, dynamic>>> fetchChatMessages(
+  Future<({List<Map<String, dynamic>> messages, bool hasMore})>
+      fetchChatMessages(
     int deliveryGuyId, {
     int? afterId,
+    int? beforeId,
+    int? limit,
   }) async {
     final uri = Uri.parse('$_baseUrl/api/conversations/$deliveryGuyId').replace(
       queryParameters: {
         if (afterId != null) 'afterId': afterId.toString(),
+        if (beforeId != null) 'beforeId': beforeId.toString(),
+        if (limit != null) 'limit': limit.toString(),
       },
     );
     final response = await _client.get(uri, headers: _headers());
     final data = await _decode(response);
-    return ((data['messages'] as List?) ?? [])
+    final messages = ((data['messages'] as List?) ?? [])
         .map((item) => Map<String, dynamic>.from(item as Map))
         .toList();
+    return (
+      messages: messages,
+      hasMore: data['hasMore'] == true,
+    );
   }
 
   Future<Map<String, dynamic>> sendChatMessage(
