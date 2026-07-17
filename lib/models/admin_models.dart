@@ -35,6 +35,7 @@ class DeliveryPartner {
   final String email;
   final String name;
   final String? phone;
+  final String? imageUrl;
   final bool isActive;
 
   const DeliveryPartner({
@@ -42,6 +43,7 @@ class DeliveryPartner {
     required this.email,
     required this.name,
     required this.phone,
+    this.imageUrl,
     required this.isActive,
   });
 
@@ -51,6 +53,7 @@ class DeliveryPartner {
       email: json['email'] as String,
       name: json['name'] as String,
       phone: json['phone'] as String?,
+      imageUrl: json['imageUrl'] as String?,
       isActive: json['isActive'] as bool? ?? true,
     );
   }

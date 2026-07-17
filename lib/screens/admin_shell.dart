@@ -19,6 +19,9 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/locale_toggle.dart';
 import '../widgets/notifications_bell_button.dart';
 import '../widgets/notifications_screen.dart';
+import '../widgets/chat_screen.dart';
+import '../widgets/chat_unread_listener.dart';
+import '../widgets/call_options_sheet.dart';
 import 'account_settings_screen.dart';
 
 class AdminShell extends StatefulWidget {
@@ -44,6 +47,7 @@ class AdminShell extends StatefulWidget {
 class _AdminShellState extends State<AdminShell> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   int _section = 0;
+  int _chatUnread = 0;
   late BusinessSettings _businessSettings;
 
   static const _sections = [
@@ -61,8 +65,9 @@ class _AdminShellState extends State<AdminShell> {
     ),
     _AdminSection(6, 'nav.shops', Icons.storefront_outlined),
     _AdminSection(7, 'nav.calendar', Icons.calendar_month_outlined),
-    _AdminSection(8, 'nav.notifications', Icons.notifications_outlined),
-    _AdminSection(9, 'nav.settings', Icons.settings_outlined),
+    _AdminSection(8, 'nav.conversations', Icons.chat_bubble_outline),
+    _AdminSection(9, 'nav.notifications', Icons.notifications_outlined),
+    _AdminSection(10, 'nav.settings', Icons.settings_outlined),
   ];
 
   @override
@@ -127,11 +132,13 @@ class _AdminShellState extends State<AdminShell> {
           businessSettings: _businessSettings,
         );
       case 8:
+        return ConversationsScreen(apiService: widget.apiService);
+      case 9:
         return NotificationsScreen(
           apiService: widget.apiService,
           showAppBar: false,
         );
-      case 9:
+      case 10:
         return _AdminSettingsPage(
           apiService: widget.apiService,
           user: widget.user,
@@ -234,6 +241,7 @@ class _AdminShellState extends State<AdminShell> {
                       section: section,
                       currentIndex: _section,
                       onSelect: _selectSection,
+                      badge: section.index == 8 ? _chatUnread : 0,
                     ),
                 ],
               ),
@@ -243,7 +251,18 @@ class _AdminShellState extends State<AdminShell> {
       ),
       body: SafeArea(
         top: false,
-        child: _buildBody(),
+        child: Column(
+          children: [
+            ChatUnreadListener(
+              apiService: widget.apiService,
+              onCount: (count) {
+                if (mounted) setState(() => _chatUnread = count);
+              },
+              suppressSnackWhen: () => _section == 8,
+            ),
+            Expanded(child: _buildBody()),
+          ],
+        ),
       ),
     );
   }
@@ -254,11 +273,13 @@ class _DrawerNavGroup extends StatelessWidget {
     required this.section,
     required this.currentIndex,
     required this.onSelect,
+    this.badge = 0,
   });
 
   final _AdminSection section;
   final int currentIndex;
   final ValueChanged<int> onSelect;
+  final int badge;
 
   bool get _childActive =>
       section.children.any((child) => child.index == currentIndex);
@@ -288,7 +309,8 @@ class _DrawerNavGroup extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               onTap: () => onSelect(section.index),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   border: _groupOpen && !_parentActive
@@ -326,6 +348,30 @@ class _DrawerNavGroup extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (badge > 0)
+                      Container(
+                        margin: const EdgeInsets.only(left: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _parentActive
+                              ? Colors.white
+                              : const Color(0xFFB45309),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          badge > 9 ? '9+' : '$badge',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: _parentActive
+                                ? const Color(0xFFB45309)
+                                : Colors.white,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -402,11 +448,8 @@ class _DrawerNavChild extends StatelessWidget {
                     t(section.labelKey),
                     style: TextStyle(
                       fontSize: 13.5,
-                      fontWeight:
-                          selected ? FontWeight.w600 : FontWeight.w500,
-                      color: selected
-                          ? Colors.white
-                          : const Color(0xFF57534E),
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                      color: selected ? Colors.white : const Color(0xFF57534E),
                     ),
                   ),
                 ),
@@ -895,7 +938,8 @@ class _AdminSalesPageState extends State<_AdminSalesPage> {
                           children: [
                             Text(
                               formatCurrencyFromString(sale.totalAmount),
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
                             ),
                             Text(
                               sale.billPrinted
@@ -1101,9 +1145,46 @@ class _AdminPartnersPageState extends State<_AdminPartnersPage> {
                   child: ListTile(
                     title: Text(partner.name),
                     subtitle: Text(partner.email),
-                    trailing: partner.isActive
-                        ? const Icon(Icons.check_circle, color: Colors.green)
-                        : const Icon(Icons.cancel, color: Colors.red),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: t('calls.call'),
+                          onPressed: () => showCallOptionsSheet(
+                            context,
+                            name: partner.name,
+                            phone: partner.phone,
+                          ),
+                          icon: const Icon(
+                            Icons.phone_outlined,
+                            color: Color(0xFF16A34A),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: t('chat.message'),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ChatScreen(
+                                  apiService: widget.apiService,
+                                  deliveryGuyId: partner.id,
+                                  title: partner.name,
+                                  imageUrl: partner.imageUrl,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.chat_bubble_outline,
+                            color: Color(0xFFB45309),
+                          ),
+                        ),
+                        partner.isActive
+                            ? const Icon(Icons.check_circle,
+                                color: Colors.green)
+                            : const Icon(Icons.cancel, color: Colors.red),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -1347,107 +1428,111 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              t('admin.assignStock'),
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 12),
-                            DropdownButtonFormField<String?>(
-                              value: _assignPartnerId,
-                              decoration: InputDecoration(
-                                labelText: t('admin.deliveryPartner'),
-                                border: const OutlineInputBorder(),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                t('admin.assignStock'),
+                                style: Theme.of(context).textTheme.titleLarge,
                               ),
-                              items: _partners
-                                  .map(
-                                    (partner) => DropdownMenuItem<String?>(
-                                      value: partner.id.toString(),
-                                      child: Text(partner.name),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (value) =>
-                                  setState(() => _assignPartnerId = value),
-                            ),
-                            const SizedBox(height: 12),
-                            ..._products.map((product) {
-                              final qty = _assignQty[product.id] ?? 0;
-                              return ListTile(
-                                contentPadding: EdgeInsets.zero,
-                                title: Text(product.name),
-                                subtitle: Text(
-                                  t(
-                                    'admin.stockAvailable',
-                                    {'count': product.stockAvailable},
-                                  ),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String?>(
+                                value: _assignPartnerId,
+                                decoration: InputDecoration(
+                                  labelText: t('admin.deliveryPartner'),
+                                  border: const OutlineInputBorder(),
                                 ),
-                                trailing: SizedBox(
-                                  width: 120,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      IconButton(
-                                        onPressed: qty > 0
-                                            ? () => setState(
-                                                  () => _assignQty[product.id] =
-                                                      qty - 1,
-                                                )
-                                            : null,
-                                        icon: const Icon(Icons.remove),
+                                items: _partners
+                                    .map(
+                                      (partner) => DropdownMenuItem<String?>(
+                                        value: partner.id.toString(),
+                                        child: Text(partner.name),
                                       ),
-                                      Text('$qty'),
-                                      IconButton(
-                                        onPressed: qty < product.stockAvailable
-                                            ? () => setState(
-                                                  () => _assignQty[product.id] =
-                                                      qty + 1,
-                                                )
-                                            : null,
-                                        icon: const Icon(Icons.add),
+                                    )
+                                    .toList(),
+                                onChanged: (value) =>
+                                    setState(() => _assignPartnerId = value),
+                              ),
+                              const SizedBox(height: 12),
+                              ..._products.map((product) {
+                                final qty = _assignQty[product.id] ?? 0;
+                                return ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(product.name),
+                                  subtitle: Text(
+                                    t(
+                                      'admin.stockAvailable',
+                                      {'count': product.stockAvailable},
+                                    ),
+                                  ),
+                                  trailing: SizedBox(
+                                    width: 120,
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        IconButton(
+                                          onPressed: qty > 0
+                                              ? () => setState(
+                                                    () =>
+                                                        _assignQty[product.id] =
+                                                            qty - 1,
+                                                  )
+                                              : null,
+                                          icon: const Icon(Icons.remove),
+                                        ),
+                                        Text('$qty'),
+                                        IconButton(
+                                          onPressed: qty <
+                                                  product.stockAvailable
+                                              ? () => setState(
+                                                    () =>
+                                                        _assignQty[product.id] =
+                                                            qty + 1,
+                                                  )
+                                              : null,
+                                          icon: const Icon(Icons.add),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: _saving
+                                          ? null
+                                          : () => setState(() {
+                                                _assignOpen = false;
+                                                _assignPartnerId = null;
+                                                _assignQty.clear();
+                                              }),
+                                      child: Text(t('common.cancel')),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: FilledButton(
+                                      onPressed:
+                                          _saving ? null : _submitAssignment,
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xFFB45309),
                                       ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: _saving
-                                        ? null
-                                        : () => setState(() {
-                                              _assignOpen = false;
-                                              _assignPartnerId = null;
-                                              _assignQty.clear();
-                                            }),
-                                    child: Text(t('common.cancel')),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: FilledButton(
-                                    onPressed:
-                                        _saving ? null : _submitAssignment,
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor:
-                                          const Color(0xFFB45309),
-                                    ),
-                                    child: Text(
-                                      _saving
-                                          ? t('common.saving')
-                                          : t('admin.assign'),
+                                      child: Text(
+                                        _saving
+                                            ? t('common.saving')
+                                            : t('admin.assign'),
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -1456,7 +1541,6 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
               ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -1969,7 +2053,9 @@ class _AdminCalendarPageState extends State<_AdminCalendarPage> {
                   Text(
                     groups.isEmpty
                         ? t('admin.calendarNoSales')
-                        : '${t('admin.saleCount', {'count': bucket?.saleCount ?? 0})} · ${t('admin.calendarDayTotal')}: ${formatCurrencyFromString((bucket?.totalAmount ?? 0).toStringAsFixed(2))}',
+                        : '${t('admin.saleCount', {
+                                'count': bucket?.saleCount ?? 0
+                              })} · ${t('admin.calendarDayTotal')}: ${formatCurrencyFromString((bucket?.totalAmount ?? 0).toStringAsFixed(2))}',
                     style: const TextStyle(color: Color(0xFF78716C)),
                   ),
                   const SizedBox(height: 12),
@@ -2022,8 +2108,8 @@ class _AdminCalendarPageState extends State<_AdminCalendarPage> {
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
-                                          onTap: () =>
-                                              Navigator.of(context).pop(sale.id),
+                                          onTap: () => Navigator.of(context)
+                                              .pop(sale.id),
                                         ),
                                       ),
                                     ],
@@ -2051,7 +2137,8 @@ class _AdminCalendarPageState extends State<_AdminCalendarPage> {
     if (mounted) _load();
   }
 
-  Widget _buildList(Map<String, _DaySalesBucket> buckets, String Function(String, [Map<String, Object?>?]) t) {
+  Widget _buildList(Map<String, _DaySalesBucket> buckets,
+      String Function(String, [Map<String, Object?>?]) t) {
     final days = buckets.values.toList()
       ..sort((a, b) => b.dateKey.compareTo(a.dateKey));
 
@@ -2195,7 +2282,8 @@ class _AdminCalendarPageState extends State<_AdminCalendarPage> {
                       },
                       calendarStyle: CalendarStyle(
                         todayDecoration: BoxDecoration(
-                          color: const Color(0xFFFBBF24).withValues(alpha: 0.35),
+                          color:
+                              const Color(0xFFFBBF24).withValues(alpha: 0.35),
                           shape: BoxShape.circle,
                         ),
                         selectedDecoration: const BoxDecoration(

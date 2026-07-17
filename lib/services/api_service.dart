@@ -449,4 +449,161 @@ class ApiService {
     );
     await _decode(response);
   }
+
+  Future<void> postLocation({
+    required double latitude,
+    required double longitude,
+    double? accuracyMeters,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$_baseUrl/api/locations'),
+      headers: _headers(),
+      body: jsonEncode({
+        'latitude': latitude,
+        'longitude': longitude,
+        if (accuracyMeters != null) 'accuracyMeters': accuracyMeters,
+      }),
+    );
+    await _decode(response);
+  }
+
+  Future<void> stopLocationTracking() async {
+    final response = await _client.delete(
+      Uri.parse('$_baseUrl/api/locations'),
+      headers: _headers(),
+    );
+    await _decode(response);
+  }
+
+  Future<List<Map<String, dynamic>>> fetchSaleComments(int saleId) async {
+    final response = await _client.get(
+      Uri.parse('$_baseUrl/api/sales/$saleId/comments'),
+      headers: _headers(),
+    );
+    final data = await _decode(response);
+    return ((data['comments'] as List?) ?? [])
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> createSaleComment(
+    int saleId, {
+    required String body,
+    int? parentId,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$_baseUrl/api/sales/$saleId/comments'),
+      headers: _headers(),
+      body: jsonEncode({
+        'body': body,
+        if (parentId != null) 'parentId': parentId,
+      }),
+    );
+    final data = await _decode(response);
+    return ((data['comments'] as List?) ?? [])
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> updateSaleComment(
+    int commentId, {
+    required String body,
+  }) async {
+    final response = await _client.patch(
+      Uri.parse('$_baseUrl/api/comments/$commentId'),
+      headers: _headers(),
+      body: jsonEncode({'body': body}),
+    );
+    final data = await _decode(response);
+    return ((data['comments'] as List?) ?? [])
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> deleteSaleComment(int commentId) async {
+    final response = await _client.delete(
+      Uri.parse('$_baseUrl/api/comments/$commentId'),
+      headers: _headers(),
+    );
+    final data = await _decode(response);
+    return ((data['comments'] as List?) ?? [])
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> fetchConversations() async {
+    final response = await _client.get(
+      Uri.parse('$_baseUrl/api/conversations'),
+      headers: _headers(),
+    );
+    return await _decode(response);
+  }
+
+  Future<int> fetchChatUnreadCount() async {
+    final response = await _client.get(
+      Uri.parse('$_baseUrl/api/conversations?unreadOnly=true'),
+      headers: _headers(),
+    );
+    final data = await _decode(response);
+    return (data['unreadCount'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<List<Map<String, dynamic>>> fetchChatMessages(
+    int deliveryGuyId, {
+    int? afterId,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/api/conversations/$deliveryGuyId').replace(
+      queryParameters: {
+        if (afterId != null) 'afterId': afterId.toString(),
+      },
+    );
+    final response = await _client.get(uri, headers: _headers());
+    final data = await _decode(response);
+    return ((data['messages'] as List?) ?? [])
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> sendChatMessage(
+    int deliveryGuyId, {
+    String body = '',
+    String? imageUrl,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$_baseUrl/api/conversations/$deliveryGuyId'),
+      headers: _headers(),
+      body: jsonEncode({
+        'body': body,
+        if (imageUrl != null) 'imageUrl': imageUrl,
+      }),
+    );
+    final data = await _decode(response);
+    return Map<String, dynamic>.from(data['message'] as Map);
+  }
+
+  Future<Map<String, dynamic>> updateChatMessage(
+    int messageId, {
+    required String body,
+  }) async {
+    final response = await _client.patch(
+      Uri.parse('$_baseUrl/api/chat-messages/$messageId'),
+      headers: _headers(),
+      body: jsonEncode({'body': body}),
+    );
+    final data = await _decode(response);
+    return Map<String, dynamic>.from(data['message'] as Map);
+  }
+
+  Future<Map<String, dynamic>?> deleteChatMessage(int messageId) async {
+    final response = await _client.delete(
+      Uri.parse('$_baseUrl/api/chat-messages/$messageId'),
+      headers: _headers(),
+    );
+    final data = await _decode(response);
+    final message = data['message'];
+    if (message is Map) {
+      return Map<String, dynamic>.from(message);
+    }
+    return null;
+  }
 }

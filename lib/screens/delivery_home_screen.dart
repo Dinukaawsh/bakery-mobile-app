@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../l10n/locale_scope.dart';
@@ -12,6 +14,7 @@ import '../models/shop_drop.dart';
 import '../models/product.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../services/location_tracking_service.dart';
 import '../widgets/bill_modal.dart';
 import '../widgets/bill_receipt_card.dart';
 import '../widgets/bakery_app_bar.dart';
@@ -20,6 +23,8 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/locale_toggle.dart';
 import '../widgets/notifications_bell_button.dart';
 import '../widgets/notifications_screen.dart';
+import '../widgets/chat_screen.dart';
+import '../widgets/chat_unread_listener.dart';
 import 'account_settings_screen.dart';
 import 'add_shop_screen.dart';
 
@@ -53,6 +58,10 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
   List<Shop> _shops = [];
   List<AllocationSummary> _allocations = [];
   late BusinessSettings _businessSettings;
+  late final LocationTrackingService _locationTracking;
+  bool _sharingLocation = false;
+  bool _togglingLocation = false;
+  int _chatUnread = 0;
   String? _error;
   bool _loading = true;
 
@@ -61,6 +70,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
     _DeliveryNavItem(1, 'delivery.mySales', Icons.storefront_outlined),
     _DeliveryNavItem(2, 'delivery.saleHistory', Icons.history_outlined),
     _DeliveryNavItem(3, 'nav.notifications', Icons.notifications_outlined),
+    _DeliveryNavItem(4, 'nav.conversations', Icons.chat_bubble_outline),
   ];
 
   _DeliveryNavItem get _currentNav =>
@@ -79,7 +89,70 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
   void initState() {
     super.initState();
     _businessSettings = widget.businessSettings;
+    _locationTracking = LocationTrackingService(widget.apiService);
     _load();
+    unawaited(_restoreLocationTracking());
+  }
+
+  @override
+  void dispose() {
+    unawaited(_locationTracking.dispose());
+    super.dispose();
+  }
+
+  Future<void> _restoreLocationTracking() async {
+    try {
+      final started = await _locationTracking.restoreIfEnabled();
+      if (!mounted) return;
+      setState(() => _sharingLocation = started);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _sharingLocation = false);
+    }
+  }
+
+  Future<void> _toggleLocationSharing() async {
+    if (_togglingLocation) return;
+    final t = LocaleScope.of(context).t;
+    setState(() => _togglingLocation = true);
+    try {
+      if (_sharingLocation) {
+        await _locationTracking.stop();
+        if (!mounted) return;
+        setState(() => _sharingLocation = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t('delivery.locationStopped'))),
+        );
+      } else {
+        final started = await _locationTracking.start();
+        if (!mounted) return;
+        if (!started) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(t('delivery.locationPermissionDenied'))),
+          );
+          return;
+        }
+        setState(() => _sharingLocation = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t('delivery.locationStarted'))),
+        );
+      }
+    } on StateError catch (error) {
+      if (!mounted) return;
+      final message = error.message == 'LOCATION_DISABLED'
+          ? t('delivery.locationDisabled')
+          : error.toString();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    } finally {
+      if (mounted) setState(() => _togglingLocation = false);
+    }
   }
 
   Future<void> _load() async {
@@ -160,7 +233,11 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
       cancelLabel: t('common.cancel'),
       isDanger: true,
     );
-    if (shouldLogout) widget.onLogout();
+    if (!shouldLogout) return;
+    if (_sharingLocation) {
+      await _locationTracking.stop();
+    }
+    widget.onLogout();
   }
 
   int get _totalAssigned =>
@@ -836,6 +913,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                       item: item,
                       selected: _section == item.index,
                       onSelect: _selectSection,
+                      badge: item.index == 4 ? _chatUnread : 0,
                     ),
                 ],
               ),
@@ -849,6 +927,33 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
               ),
               child: Column(
                 children: [
+                  SwitchListTile(
+                    secondary: Icon(
+                      _sharingLocation
+                          ? Icons.location_on
+                          : Icons.location_off_outlined,
+                      color: _sharingLocation
+                          ? const Color(0xFFB45309)
+                          : const Color(0xFF78716C),
+                    ),
+                    title: Text(
+                      _sharingLocation
+                          ? t('delivery.sharingLocation')
+                          : t('delivery.shareLocation'),
+                    ),
+                    subtitle: Text(
+                      t('delivery.locationHint'),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    value: _sharingLocation,
+                    onChanged: _togglingLocation
+                        ? null
+                        : (_) => _toggleLocationSharing(),
+                    activeThumbColor: const Color(0xFFB45309),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                   ListTile(
                     leading: widget.user.imageUrl != null &&
                             widget.user.imageUrl!.trim().isNotEmpty
@@ -865,8 +970,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                     ),
                     onTap: () async {
                       Navigator.of(context).maybePop();
-                      final updated =
-                          await Navigator.of(context).push<AppUser>(
+                      final updated = await Navigator.of(context).push<AppUser>(
                         MaterialPageRoute(
                           builder: (_) => AccountSettingsScreen(
                             apiService: widget.apiService,
@@ -909,6 +1013,41 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
       ),
       body: Column(
         children: [
+          ChatUnreadListener(
+            apiService: widget.apiService,
+            onCount: (count) {
+              if (mounted) setState(() => _chatUnread = count);
+            },
+            suppressSnackWhen: () => _section == 4,
+          ),
+          if (_sharingLocation)
+            Material(
+              color: const Color(0xFFFEF3C7),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on, color: Color(0xFFB45309)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        t('delivery.sharingLocation'),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF92400E),
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed:
+                          _togglingLocation ? null : _toggleLocationSharing,
+                      child: Text(t('delivery.stopSharing')),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.all(12),
@@ -925,11 +1064,17 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                             ? _mySalesTab(t)
                             : _section == 2
                                 ? _historyTab(t)
-                                : NotificationsScreen(
-                                    apiService: widget.apiService,
-                                    showAppBar: false,
-                                    deliveryMode: true,
-                                  ),
+                                : _section == 3
+                                    ? NotificationsScreen(
+                                        apiService: widget.apiService,
+                                        showAppBar: false,
+                                        deliveryMode: true,
+                                      )
+                                    : ConversationsScreen(
+                                        apiService: widget.apiService,
+                                        isDelivery: true,
+                                        myUserId: widget.user.id,
+                                      ),
                   ),
           ),
         ],
@@ -951,11 +1096,13 @@ class _DeliveryDrawerItem extends StatelessWidget {
     required this.item,
     required this.selected,
     required this.onSelect,
+    this.badge = 0,
   });
 
   final _DeliveryNavItem item;
   final bool selected;
   final ValueChanged<int> onSelect;
+  final int badge;
 
   @override
   Widget build(BuildContext context) {
@@ -985,8 +1132,7 @@ class _DeliveryDrawerItem extends StatelessWidget {
                   child: Icon(
                     item.icon,
                     size: 20,
-                    color:
-                        selected ? Colors.white : const Color(0xFFB45309),
+                    color: selected ? Colors.white : const Color(0xFFB45309),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -995,11 +1141,30 @@ class _DeliveryDrawerItem extends StatelessWidget {
                     t(item.labelKey),
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      color:
-                          selected ? Colors.white : const Color(0xFF1C1917),
+                      color: selected ? Colors.white : const Color(0xFF1C1917),
                     ),
                   ),
                 ),
+                if (badge > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: selected ? Colors.white : const Color(0xFFB45309),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      badge > 9 ? '9+' : '$badge',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color:
+                            selected ? const Color(0xFFB45309) : Colors.white,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1290,14 +1455,14 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                           value: shop,
                           child: Text(
                             () {
-                              final route = shop.route == null ||
-                                      shop.route!.isEmpty
-                                  ? ''
-                                  : ' (${shop.route})';
+                              final route =
+                                  shop.route == null || shop.route!.isEmpty
+                                      ? ''
+                                      : ' (${shop.route})';
                               final owes = shop.outstandingAsDouble > 0
                                   ? ' • ${t('delivery.owes', {
-                                        'amount': shop.outstandingBalance,
-                                      })}'
+                                          'amount': shop.outstandingBalance,
+                                        })}'
                                   : '';
                               return '${shop.name}$route$owes';
                             }(),
@@ -1337,8 +1502,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
             ..._availableAllocations.map((allocation) {
               final qty = _quantities[allocation.productId] ?? 0;
               final product = _productMap[allocation.productId];
-              final imageUrl =
-                  allocation.productImageUrl ?? product?.imageUrl;
+              final imageUrl = allocation.productImageUrl ?? product?.imageUrl;
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
@@ -1377,8 +1541,8 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                     IconButton(
                       onPressed: qty > 0
                           ? () => setState(
-                                () => _quantities[allocation.productId] =
-                                    qty - 1,
+                                () =>
+                                    _quantities[allocation.productId] = qty - 1,
                               )
                           : null,
                       icon: const Icon(Icons.remove),
@@ -1393,8 +1557,8 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                     IconButton(
                       onPressed: qty < allocation.remaining
                           ? () => setState(
-                                () => _quantities[allocation.productId] =
-                                    qty + 1,
+                                () =>
+                                    _quantities[allocation.productId] = qty + 1,
                               )
                           : null,
                       icon: const Icon(Icons.add),

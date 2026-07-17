@@ -10,6 +10,7 @@ import '../utils/safe_insets.dart';
 import '../widgets/bakery_app_bar.dart';
 import '../widgets/bakery_loading_spinner.dart';
 import '../widgets/bill_receipt_card.dart';
+import '../widgets/sale_comments_section.dart';
 
 class BillScreen extends StatefulWidget {
   const BillScreen({
@@ -309,6 +310,10 @@ class _BillScreenState extends State<BillScreen> {
                         side: const BorderSide(color: Color(0xFFFDE68A)),
                       ),
                       child: Text(t('bill.done')),
+                    ),
+                    SaleCommentsSection(
+                      apiService: widget.apiService,
+                      saleId: sale.id,
                     ),
                   ],
                 ),
