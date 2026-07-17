@@ -50,7 +50,7 @@ class _AdminShellState extends State<AdminShell> {
   int _chatUnread = 0;
   late BusinessSettings _businessSettings;
 
-  static const _sections = [
+  static const _allSections = [
     _AdminSection(0, 'nav.dashboard', Icons.dashboard_outlined),
     _AdminSection(1, 'nav.products', Icons.inventory_2_outlined),
     _AdminSection(2, 'nav.sales', Icons.payments_outlined),
@@ -70,6 +70,15 @@ class _AdminShellState extends State<AdminShell> {
     _AdminSection(10, 'nav.settings', Icons.settings_outlined),
   ];
 
+  List<_AdminSection> get _sections {
+    final features = widget.apiService.features;
+    return _allSections.where((section) {
+      if (section.index == 7) return features.calendar;
+      if (section.index == 8) return features.messages;
+      return true;
+    }).toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -77,20 +86,35 @@ class _AdminShellState extends State<AdminShell> {
   }
 
   _AdminSection _sectionByIndex(int index) {
-    for (final section in _sections) {
+    for (final section in _allSections) {
       if (section.index == index) return section;
       for (final child in section.children) {
         if (child.index == index) return child;
       }
     }
-    return _sections.first;
+    return _allSections.first;
+  }
+
+  void _selectSection(int index) {
+    final features = widget.apiService.features;
+    if (index == 7 && !features.calendar) return;
+    if (index == 8 && !features.messages) return;
+    setState(() => _section = index);
+    Navigator.of(context).pop();
   }
 
   Future<void> _refreshSettings() async {
     try {
       final settings = await widget.apiService.fetchBusinessSettings();
       if (!mounted) return;
-      setState(() => _businessSettings = settings);
+      setState(() {
+        _businessSettings = settings;
+        final features = widget.apiService.features;
+        if ((_section == 7 && !features.calendar) ||
+            (_section == 8 && !features.messages)) {
+          _section = 0;
+        }
+      });
     } catch (_) {}
   }
 
@@ -127,11 +151,17 @@ class _AdminShellState extends State<AdminShell> {
       case 6:
         return _AdminShopsPage(apiService: widget.apiService);
       case 7:
+        if (!widget.apiService.features.calendar) {
+          return const SizedBox.shrink();
+        }
         return _AdminCalendarPage(
           apiService: widget.apiService,
           businessSettings: _businessSettings,
         );
       case 8:
+        if (!widget.apiService.features.messages) {
+          return const SizedBox.shrink();
+        }
         return ConversationsScreen(apiService: widget.apiService);
       case 9:
         return NotificationsScreen(
@@ -149,11 +179,6 @@ class _AdminShellState extends State<AdminShell> {
       default:
         return const SizedBox.shrink();
     }
-  }
-
-  void _selectSection(int index) {
-    setState(() => _section = index);
-    Navigator.of(context).pop();
   }
 
   @override
@@ -253,13 +278,14 @@ class _AdminShellState extends State<AdminShell> {
         top: false,
         child: Column(
           children: [
-            ChatUnreadListener(
-              apiService: widget.apiService,
-              onCount: (count) {
-                if (mounted) setState(() => _chatUnread = count);
-              },
-              suppressSnackWhen: () => _section == 8,
-            ),
+            if (widget.apiService.features.messages)
+              ChatUnreadListener(
+                apiService: widget.apiService,
+                onCount: (count) {
+                  if (mounted) setState(() => _chatUnread = count);
+                },
+                suppressSnackWhen: () => _section == 8,
+              ),
             Expanded(child: _buildBody()),
           ],
         ),
@@ -1160,25 +1186,26 @@ class _AdminPartnersPageState extends State<_AdminPartnersPage> {
                             color: Color(0xFF16A34A),
                           ),
                         ),
-                        IconButton(
-                          tooltip: t('chat.message'),
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => ChatScreen(
-                                  apiService: widget.apiService,
-                                  deliveryGuyId: partner.id,
-                                  title: partner.name,
-                                  imageUrl: partner.imageUrl,
+                        if (widget.apiService.features.messages)
+                          IconButton(
+                            tooltip: t('chat.message'),
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => ChatScreen(
+                                    apiService: widget.apiService,
+                                    deliveryGuyId: partner.id,
+                                    title: partner.name,
+                                    imageUrl: partner.imageUrl,
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.chat_bubble_outline,
-                            color: Color(0xFFB45309),
+                              );
+                            },
+                            icon: const Icon(
+                              Icons.chat_bubble_outline,
+                              color: Color(0xFFB45309),
+                            ),
                           ),
-                        ),
                         partner.isActive
                             ? const Icon(Icons.check_circle,
                                 color: Colors.green)

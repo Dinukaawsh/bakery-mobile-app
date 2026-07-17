@@ -65,7 +65,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
   String? _error;
   bool _loading = true;
 
-  static const _navItems = [
+  static const _allNavItems = [
     _DeliveryNavItem(0, 'delivery.myAssignments', Icons.inventory_2_outlined),
     _DeliveryNavItem(1, 'delivery.mySales', Icons.storefront_outlined),
     _DeliveryNavItem(2, 'delivery.saleHistory', Icons.history_outlined),
@@ -73,14 +73,26 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
     _DeliveryNavItem(4, 'nav.conversations', Icons.chat_bubble_outline),
   ];
 
+  List<_DeliveryNavItem> get _navItems {
+    final features = widget.apiService.features;
+    return _allNavItems.where((item) {
+      if (item.index == 4) return features.messages;
+      return true;
+    }).toList();
+  }
+
   _DeliveryNavItem get _currentNav =>
-      _navItems.firstWhere((item) => item.index == _section);
+      _navItems.firstWhere(
+        (item) => item.index == _section,
+        orElse: () => _allNavItems.first,
+      );
 
   String _sevenDaysAgoDate() => colomboDaysAgoDateString(7);
 
   String _todayDate() => localDateString();
 
   void _selectSection(int index) {
+    if (index == 4 && !widget.apiService.features.messages) return;
     setState(() => _section = index);
     Navigator.of(context).maybePop();
   }
@@ -91,7 +103,9 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
     _businessSettings = widget.businessSettings;
     _locationTracking = LocationTrackingService(widget.apiService);
     _load();
-    unawaited(_restoreLocationTracking());
+    if (widget.apiService.features.map) {
+      unawaited(_restoreLocationTracking());
+    }
   }
 
   @override
@@ -927,33 +941,34 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
               ),
               child: Column(
                 children: [
-                  SwitchListTile(
-                    secondary: Icon(
-                      _sharingLocation
-                          ? Icons.location_on
-                          : Icons.location_off_outlined,
-                      color: _sharingLocation
-                          ? const Color(0xFFB45309)
-                          : const Color(0xFF78716C),
+                  if (widget.apiService.features.map)
+                    SwitchListTile(
+                      secondary: Icon(
+                        _sharingLocation
+                            ? Icons.location_on
+                            : Icons.location_off_outlined,
+                        color: _sharingLocation
+                            ? const Color(0xFFB45309)
+                            : const Color(0xFF78716C),
+                      ),
+                      title: Text(
+                        _sharingLocation
+                            ? t('delivery.sharingLocation')
+                            : t('delivery.shareLocation'),
+                      ),
+                      subtitle: Text(
+                        t('delivery.locationHint'),
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      value: _sharingLocation,
+                      onChanged: _togglingLocation
+                          ? null
+                          : (_) => _toggleLocationSharing(),
+                      activeThumbColor: const Color(0xFFB45309),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    title: Text(
-                      _sharingLocation
-                          ? t('delivery.sharingLocation')
-                          : t('delivery.shareLocation'),
-                    ),
-                    subtitle: Text(
-                      t('delivery.locationHint'),
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    value: _sharingLocation,
-                    onChanged: _togglingLocation
-                        ? null
-                        : (_) => _toggleLocationSharing(),
-                    activeThumbColor: const Color(0xFFB45309),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
                   ListTile(
                     leading: widget.user.imageUrl != null &&
                             widget.user.imageUrl!.trim().isNotEmpty
@@ -1013,14 +1028,15 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
       ),
       body: Column(
         children: [
-          ChatUnreadListener(
-            apiService: widget.apiService,
-            onCount: (count) {
-              if (mounted) setState(() => _chatUnread = count);
-            },
-            suppressSnackWhen: () => _section == 4,
-          ),
-          if (_sharingLocation)
+          if (widget.apiService.features.messages)
+            ChatUnreadListener(
+              apiService: widget.apiService,
+              onCount: (count) {
+                if (mounted) setState(() => _chatUnread = count);
+              },
+              suppressSnackWhen: () => _section == 4,
+            ),
+          if (_sharingLocation && widget.apiService.features.map)
             Material(
               color: const Color(0xFFFEF3C7),
               child: Padding(
@@ -1070,11 +1086,13 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                                         showAppBar: false,
                                         deliveryMode: true,
                                       )
-                                    : ConversationsScreen(
-                                        apiService: widget.apiService,
-                                        isDelivery: true,
-                                        myUserId: widget.user.id,
-                                      ),
+                                    : widget.apiService.features.messages
+                                        ? ConversationsScreen(
+                                            apiService: widget.apiService,
+                                            isDelivery: true,
+                                            myUserId: widget.user.id,
+                                          )
+                                        : const SizedBox.shrink(),
                   ),
           ),
         ],

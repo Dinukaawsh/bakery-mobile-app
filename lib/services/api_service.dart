@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
 import '../models/admin_models.dart';
 import '../models/allocation.dart';
+import '../models/app_features.dart';
 import '../models/business_settings.dart';
 import '../models/product.dart';
 import '../models/sale.dart';
@@ -23,6 +24,7 @@ class ApiService {
   final String _baseUrl = AppConfig.apiBaseUrl;
   String? _token;
   void Function()? onAccountSuspended;
+  AppFeatures features = AppFeatures.allEnabled;
 
   Future<void> loadToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -110,6 +112,11 @@ class ApiService {
       headers: _headers(),
     );
     final data = await _decode(response);
+    features = AppFeatures.fromJson(
+      data['features'] is Map<String, dynamic>
+          ? data['features'] as Map<String, dynamic>
+          : null,
+    );
     return BusinessSettings.fromJson(
       data['settings'] as Map<String, dynamic>,
     );
