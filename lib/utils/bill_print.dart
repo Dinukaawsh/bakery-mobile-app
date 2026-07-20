@@ -3,6 +3,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '../l10n/app_locale.dart';
 import '../models/business_settings.dart';
 import '../utils/currency.dart';
 import '../widgets/bill_receipt_card.dart';
@@ -21,6 +22,7 @@ Future<void> printBillReceipt({
   required List<BillLineItem> items,
   required double totalAmount,
   required BillTranslate t,
+  AppLocale locale = AppLocale.en,
   double previousBalance = 0,
   double paidAmount = 0,
   double? remainingAfter,
@@ -38,28 +40,40 @@ Future<void> printBillReceipt({
   final sinhalaRegular = pw.Font.ttf(sinhalaRegularData);
   final sinhalaBold = pw.Font.ttf(sinhalaBoldData);
 
-  // Prefer broad Latin coverage for EN + fallback Sinhala shaping.
-  pw.Font baseFont;
-  pw.Font boldFont;
+  pw.Font latinRegular;
+  pw.Font latinBold;
   try {
-    baseFont = await PdfGoogleFonts.notoSansRegular();
-    boldFont = await PdfGoogleFonts.notoSansBold();
+    latinRegular = await PdfGoogleFonts.notoSansRegular();
+    latinBold = await PdfGoogleFonts.notoSansBold();
   } catch (_) {
-    // Offline fallback: still render Sinhala reliably.
-    baseFont = sinhalaRegular;
-    boldFont = sinhalaBold;
+    latinRegular = sinhalaRegular;
+    latinBold = sinhalaBold;
   }
 
-  pw.TextStyle baseStyle({
+  final useSinhalaPrimary = locale == AppLocale.si;
+  final primaryRegular = useSinhalaPrimary ? sinhalaRegular : latinRegular;
+  final primaryBold = useSinhalaPrimary ? sinhalaBold : latinBold;
+
+  bool containsSinhala(String text) {
+    return text.runes.any((rune) => rune >= 0x0D80 && rune <= 0x0DFF);
+  }
+
+  pw.TextStyle styleFor(
+    String text, {
     double fontSize = 10,
     bool bold = false,
   }) {
+    final useSinhalaFont = useSinhalaPrimary || containsSinhala(text);
+    final font = useSinhalaFont
+        ? (bold ? sinhalaBold : sinhalaRegular)
+        : (bold ? latinBold : latinRegular);
+
     return pw.TextStyle(
-      font: bold ? boldFont : baseFont,
-      fontFallback: [sinhalaRegular, sinhalaBold],
+      font: font,
       fontSize: fontSize,
       fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-      lineSpacing: 1.2,
+      lineSpacing: useSinhalaFont ? 1.45 : 1.2,
+      letterSpacing: useSinhalaFont ? 0.15 : 0,
     );
   }
 
@@ -74,18 +88,32 @@ Future<void> printBillReceipt({
       pageFormat: PdfPageFormat.roll80,
       margin: const pw.EdgeInsets.all(12),
       theme: pw.ThemeData.withFont(
-        base: baseFont,
-        bold: boldFont,
-        icons: baseFont,
+        base: primaryRegular,
+        bold: primaryBold,
+        icons: primaryRegular,
       ),
       build: (context) {
+        final telLabel = t('bill.tel', {'phone': settings.phone});
+        final shopLabel = t('bill.shop');
+        final deliveryLabel = t('bill.delivery');
+        final todaysDropLabel = t('bill.todaysDrop');
+        final previousUnpaidLabel = t('bill.previousUnpaid');
+        final totalDueLabel = t('bill.totalDue');
+        final paidLabel = t('bill.paid');
+        final remainingLabel = t('bill.remaining');
+        final thankYouLabel = t('bill.thankYou');
+
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Center(
               child: pw.Text(
                 settings.businessName,
-                style: baseStyle(fontSize: 14, bold: true),
+                style: styleFor(
+                  settings.businessName,
+                  fontSize: 14,
+                  bold: true,
+                ),
                 textAlign: pw.TextAlign.center,
               ),
             ),
@@ -93,7 +121,7 @@ Future<void> printBillReceipt({
               pw.Center(
                 child: pw.Text(
                   settings.ownerName!,
-                  style: baseStyle(fontSize: 9),
+                  style: styleFor(settings.ownerName!, fontSize: 9),
                   textAlign: pw.TextAlign.center,
                 ),
               ),
@@ -101,37 +129,40 @@ Future<void> printBillReceipt({
               pw.Center(
                 child: pw.Text(
                   settings.address,
-                  style: baseStyle(fontSize: 9),
+                  style: styleFor(settings.address, fontSize: 9),
                   textAlign: pw.TextAlign.center,
                 ),
               ),
             if (settings.phone.isNotEmpty)
               pw.Center(
                 child: pw.Text(
-                  t('bill.tel', {'phone': settings.phone}),
-                  style: baseStyle(fontSize: 9),
+                  telLabel,
+                  style: styleFor(telLabel, fontSize: 9),
                 ),
               ),
             pw.SizedBox(height: 6),
             pw.Center(
               child: pw.Text(
                 billNumberLabel,
-                style: baseStyle(bold: true),
+                style: styleFor(billNumberLabel, bold: true),
               ),
             ),
             pw.Divider(),
-            pw.Text(t('bill.shop'), style: baseStyle(bold: true)),
-            pw.Text(shopName, style: baseStyle()),
+            pw.Text(shopLabel, style: styleFor(shopLabel, bold: true)),
+            pw.Text(shopName, style: styleFor(shopName)),
             if (shopOwner != null && shopOwner.isNotEmpty)
-              pw.Text(shopOwner, style: baseStyle()),
+              pw.Text(shopOwner, style: styleFor(shopOwner)),
             if (shopAddress != null && shopAddress.isNotEmpty)
-              pw.Text(shopAddress, style: baseStyle()),
+              pw.Text(shopAddress, style: styleFor(shopAddress)),
             if (shopPhone != null && shopPhone.isNotEmpty)
-              pw.Text(shopPhone, style: baseStyle()),
+              pw.Text(shopPhone, style: styleFor(shopPhone)),
             pw.SizedBox(height: 6),
-            pw.Text(t('bill.delivery'), style: baseStyle(bold: true)),
-            pw.Text(deliveryName, style: baseStyle()),
-            pw.Text(dateLabel, style: baseStyle()),
+            pw.Text(
+              deliveryLabel,
+              style: styleFor(deliveryLabel, bold: true),
+            ),
+            pw.Text(deliveryName, style: styleFor(deliveryName)),
+            pw.Text(dateLabel, style: styleFor(dateLabel)),
             pw.SizedBox(height: 6),
             pw.Divider(),
             for (final item in items)
@@ -140,11 +171,20 @@ Future<void> printBillReceipt({
                 child: pw.Row(
                   children: [
                     pw.Expanded(
-                      child: pw.Text(item.productName, style: baseStyle()),
+                      child: pw.Text(
+                        item.productName,
+                        style: styleFor(item.productName),
+                      ),
                     ),
-                    pw.Text('${item.quantity}', style: baseStyle()),
+                    pw.Text(
+                      '${item.quantity}',
+                      style: styleFor('${item.quantity}'),
+                    ),
                     pw.SizedBox(width: 8),
-                    pw.Text(formatCurrency(item.lineTotal), style: baseStyle()),
+                    pw.Text(
+                      formatCurrency(item.lineTotal),
+                      style: styleFor(formatCurrency(item.lineTotal)),
+                    ),
                   ],
                 ),
               ),
@@ -152,42 +192,63 @@ Future<void> printBillReceipt({
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text(t('bill.todaysDrop'), style: baseStyle()),
-                pw.Text(formatCurrency(totalAmount), style: baseStyle()),
+                pw.Text(
+                  todaysDropLabel,
+                  style: styleFor(todaysDropLabel),
+                ),
+                pw.Text(
+                  formatCurrency(totalAmount),
+                  style: styleFor(formatCurrency(totalAmount)),
+                ),
               ],
             ),
             if (previousBalance > 0)
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text(t('bill.previousUnpaid'), style: baseStyle()),
-                  pw.Text(formatCurrency(previousBalance), style: baseStyle()),
+                  pw.Text(
+                    previousUnpaidLabel,
+                    style: styleFor(previousUnpaidLabel),
+                  ),
+                  pw.Text(
+                    formatCurrency(previousBalance),
+                    style: styleFor(formatCurrency(previousBalance)),
+                  ),
                 ],
               ),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text(t('bill.totalDue'), style: baseStyle(bold: true)),
+                pw.Text(
+                  totalDueLabel,
+                  style: styleFor(totalDueLabel, bold: true),
+                ),
                 pw.Text(
                   formatCurrency(amountDue),
-                  style: baseStyle(bold: true),
+                  style: styleFor(formatCurrency(amountDue), bold: true),
                 ),
               ],
             ),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text(t('bill.paid'), style: baseStyle()),
-                pw.Text(formatCurrency(paidAmount), style: baseStyle()),
+                pw.Text(paidLabel, style: styleFor(paidLabel)),
+                pw.Text(
+                  formatCurrency(paidAmount),
+                  style: styleFor(formatCurrency(paidAmount)),
+                ),
               ],
             ),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text(t('bill.remaining'), style: baseStyle(bold: true)),
+                pw.Text(
+                  remainingLabel,
+                  style: styleFor(remainingLabel, bold: true),
+                ),
                 pw.Text(
                   formatCurrency(remaining),
-                  style: baseStyle(bold: true),
+                  style: styleFor(formatCurrency(remaining), bold: true),
                 ),
               ],
             ),
@@ -195,14 +256,14 @@ Future<void> printBillReceipt({
               pw.SizedBox(height: 6),
               pw.Text(
                 t('bill.notes', {'notes': notes}),
-                style: baseStyle(),
+                style: styleFor(t('bill.notes', {'notes': notes})),
               ),
             ],
             pw.SizedBox(height: 10),
             pw.Center(
               child: pw.Text(
-                t('bill.thankYou'),
-                style: baseStyle(fontSize: 8),
+                thankYouLabel,
+                style: styleFor(thankYouLabel, fontSize: 8),
                 textAlign: pw.TextAlign.center,
               ),
             ),

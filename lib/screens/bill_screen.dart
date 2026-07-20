@@ -166,6 +166,7 @@ class _BillScreenState extends State<BillScreen> {
         items: _lineItems(current),
         totalAmount: _todayTotal(current),
         t: t,
+        locale: LocaleScope.of(context).locale,
         previousBalance: _previous(current),
         paidAmount: double.tryParse(current.paidAmount) ?? paid,
         remainingAfter: double.tryParse(current.remainingAfter),
