@@ -64,6 +64,8 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
   int _chatUnread = 0;
   String? _error;
   bool _loading = true;
+  bool _openingCreate = false;
+  bool _openingBill = false;
 
   static const _allNavItems = [
     _DeliveryNavItem(0, 'delivery.myAssignments', Icons.inventory_2_outlined),
@@ -81,8 +83,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
     }).toList();
   }
 
-  _DeliveryNavItem get _currentNav =>
-      _navItems.firstWhere(
+  _DeliveryNavItem get _currentNav => _navItems.firstWhere(
         (item) => item.index == _section,
         orElse: () => _allNavItems.first,
       );
@@ -201,40 +202,50 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
   }
 
   Future<void> _openCreateDelivery() async {
-    await _load();
-    if (!mounted) return;
-    final sale = await Navigator.of(context).push<Sale>(
-      MaterialPageRoute(
-        builder: (_) => CreateDeliveryScreen(
-          apiService: widget.apiService,
-          user: widget.user,
-          shops: _shops,
-          businessSettings: _businessSettings,
+    if (_openingCreate) return;
+    setState(() => _openingCreate = true);
+    try {
+      final sale = await Navigator.of(context).push<Sale>(
+        MaterialPageRoute(
+          builder: (_) => CreateDeliveryScreen(
+            apiService: widget.apiService,
+            user: widget.user,
+            shops: _shops,
+            businessSettings: _businessSettings,
+          ),
         ),
-      ),
-    );
-    if (!mounted) return;
-    if (sale != null) {
-      await showBillModal(
-        context,
-        apiService: widget.apiService,
-        saleId: sale.id,
-        businessSettings: _businessSettings,
       );
+      if (!mounted) return;
+      if (sale != null) {
+        await showBillModal(
+          context,
+          apiService: widget.apiService,
+          saleId: sale.id,
+          businessSettings: _businessSettings,
+        );
+      }
+      if (!mounted) return;
+      await _load();
+    } finally {
+      if (mounted) setState(() => _openingCreate = false);
     }
-    if (!mounted) return;
-    await _load();
   }
 
   Future<void> _openBill(int saleId) async {
-    await showBillModal(
-      context,
-      apiService: widget.apiService,
-      saleId: saleId,
-      businessSettings: _businessSettings,
-    );
-    if (!mounted) return;
-    await _load();
+    if (_openingBill) return;
+    setState(() => _openingBill = true);
+    try {
+      await showBillModal(
+        context,
+        apiService: widget.apiService,
+        saleId: saleId,
+        businessSettings: _businessSettings,
+      );
+      if (!mounted) return;
+      await _load();
+    } finally {
+      if (mounted) setState(() => _openingBill = false);
+    }
   }
 
   Future<void> _confirmLogout() async {
@@ -1019,11 +1030,19 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
       floatingActionButton: Padding(
         padding: EdgeInsets.only(bottom: systemBottomInset(context)),
         child: FloatingActionButton.extended(
-          onPressed: _openCreateDelivery,
+          onPressed: _openingCreate ? null : _openCreateDelivery,
           backgroundColor: const Color(0xFFB45309),
           foregroundColor: Colors.white,
-          label: Text(t('delivery.titleNew')),
-          icon: const Icon(Icons.add),
+          label: Text(
+            _openingCreate ? t('common.loading') : t('delivery.titleNew'),
+          ),
+          icon: _openingCreate
+              ? const BakeryLoadingSpinner(
+                  size: BakerySpinnerSize.sm,
+                  color: Colors.white,
+                  trackColor: Color(0x33FFFFFF),
+                )
+              : const Icon(Icons.add),
         ),
       ),
       body: Column(

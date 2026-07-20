@@ -109,6 +109,10 @@ class _BillScreenState extends State<BillScreen> {
     return paid;
   }
 
+  double get _enteredPaid => double.tryParse(_paidController.text.trim()) ?? 0;
+
+  bool _paidExceedsDue(Sale sale) => _enteredPaid > _amountDue(sale);
+
   Future<void> _savePayment() async {
     final sale = _sale;
     if (sale == null || _savingPayment) return;
@@ -271,12 +275,22 @@ class _BillScreenState extends State<BillScreen> {
                       decoration: InputDecoration(
                         labelText: t('bill.amountPaid'),
                         hintText: '0.00',
-                        helperText: t(
-                          'bill.totalDueHelper',
-                          {
-                            'amount': formatCurrency(_amountDue(sale)),
-                          },
-                        ),
+                        helperText: _paidExceedsDue(sale)
+                            ? t(
+                                'bill.paidAmountCapped',
+                                {
+                                  'amount': formatCurrency(_amountDue(sale)),
+                                },
+                              )
+                            : t(
+                                'bill.totalDueHelper',
+                                {
+                                  'amount': formatCurrency(_amountDue(sale)),
+                                },
+                              ),
+                        helperStyle: _paidExceedsDue(sale)
+                            ? const TextStyle(color: Color(0xFFB45309))
+                            : null,
                         border: const OutlineInputBorder(),
                       ),
                       onChanged: (_) => setState(() {}),

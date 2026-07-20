@@ -180,6 +180,7 @@ const Map<String, String> stringsEn = {
   'bill.remaining': 'Remaining (Rs)',
   'bill.amountPaid': 'Amount paid (Rs)',
   'bill.totalDueHelper': 'Total due: {amount}',
+  'bill.paidAmountCapped': 'Amount capped at total due ({amount})',
   'bill.savePayment': 'Save payment',
   'bill.paymentSaved': 'Payment saved',
   'bill.printBill': 'Print bill',

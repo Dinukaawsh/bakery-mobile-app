@@ -180,6 +180,7 @@ const Map<String, String> stringsSi = {
   'bill.remaining': 'ඉතිරි (රු)',
   'bill.amountPaid': 'ගෙවූ මුදල (රු)',
   'bill.totalDueHelper': 'ගෙවිය යුතු මුළු: {amount}',
+  'bill.paidAmountCapped': 'මුදල ගෙවිය යුතු මුළු වෙත සීමා කර ඇත ({amount})',
   'bill.savePayment': 'ගෙවීම සුරකින්න',
   'bill.paymentSaved': 'ගෙවීම සුරකින ලදී',
   'bill.printBill': 'බිල්පත මුද්‍රණය',
