@@ -29,24 +29,37 @@ Future<void> printBillReceipt({
   String? shopPhone,
   String? notes,
 }) async {
-  final fontData = await rootBundle.load(
+  final sinhalaRegularData = await rootBundle.load(
     'assets/fonts/NotoSansSinhala-Regular.ttf',
   );
-  final fontBoldData = await rootBundle.load(
+  final sinhalaBoldData = await rootBundle.load(
     'assets/fonts/NotoSansSinhala-Bold.ttf',
   );
-  final font = pw.Font.ttf(fontData);
-  final fontBold = pw.Font.ttf(fontBoldData);
+  final sinhalaRegular = pw.Font.ttf(sinhalaRegularData);
+  final sinhalaBold = pw.Font.ttf(sinhalaBoldData);
+
+  // Prefer broad Latin coverage for EN + fallback Sinhala shaping.
+  pw.Font baseFont;
+  pw.Font boldFont;
+  try {
+    baseFont = await PdfGoogleFonts.notoSansRegular();
+    boldFont = await PdfGoogleFonts.notoSansBold();
+  } catch (_) {
+    // Offline fallback: still render Sinhala reliably.
+    baseFont = sinhalaRegular;
+    boldFont = sinhalaBold;
+  }
 
   pw.TextStyle baseStyle({
     double fontSize = 10,
     bool bold = false,
   }) {
     return pw.TextStyle(
-      font: bold ? fontBold : font,
-      fontFallback: [font],
+      font: bold ? boldFont : baseFont,
+      fontFallback: [sinhalaRegular, sinhalaBold],
       fontSize: fontSize,
       fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+      lineSpacing: 1.2,
     );
   }
 
@@ -60,7 +73,11 @@ Future<void> printBillReceipt({
     pw.Page(
       pageFormat: PdfPageFormat.roll80,
       margin: const pw.EdgeInsets.all(12),
-      theme: pw.ThemeData.withFont(base: font, bold: fontBold),
+      theme: pw.ThemeData.withFont(
+        base: baseFont,
+        bold: boldFont,
+        icons: baseFont,
+      ),
       build: (context) {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,

@@ -58,6 +58,7 @@ class _BakeryAppState extends State<BakeryApp> {
   @override
   Widget build(BuildContext context) {
     const amberSeed = Color(0xFFD97706);
+    final isSinhala = _localeController.locale == AppLocale.si;
 
     return LocaleScope(
       controller: _localeController,
@@ -67,7 +68,7 @@ class _BakeryAppState extends State<BakeryApp> {
           return MaterialApp(
             title: 'Bakery Mobile',
             theme: ThemeData(
-              fontFamily: 'NotoSansSinhala',
+              fontFamily: isSinhala ? 'NotoSansSinhala' : null,
               colorScheme: ColorScheme.fromSeed(
                 seedColor: amberSeed,
                 primary: const Color(0xFFB45309),
@@ -75,6 +76,16 @@ class _BakeryAppState extends State<BakeryApp> {
               ),
               useMaterial3: true,
               scaffoldBackgroundColor: const Color(0xFFFFFBEB),
+              textTheme: ThemeData.light()
+                  .textTheme
+                  .apply(
+                    fontFamily: isSinhala ? 'NotoSansSinhala' : null,
+                  )
+                  .copyWith(
+                    bodySmall: const TextStyle(height: 1.25),
+                    bodyMedium: const TextStyle(height: 1.3),
+                    bodyLarge: const TextStyle(height: 1.3),
+                  ),
               inputDecorationTheme: InputDecorationTheme(
                 filled: true,
                 fillColor: const Color(0xFFFFFBEB),

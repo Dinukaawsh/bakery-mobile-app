@@ -37,6 +37,7 @@ class _BillScreenState extends State<BillScreen> {
   bool _printing = false;
   bool _savingPayment = false;
   final _paidController = TextEditingController();
+  final _paidFocus = FocusNode();
 
   @override
   void initState() {
@@ -46,8 +47,15 @@ class _BillScreenState extends State<BillScreen> {
 
   @override
   void dispose() {
+    _paidFocus.dispose();
     _paidController.dispose();
     super.dispose();
+  }
+
+  String _displayPaidAmount(String amount) {
+    final value = double.tryParse(amount) ?? 0;
+    if (value <= 0) return "";
+    return value.toStringAsFixed(2);
   }
 
   Future<void> _load() async {
@@ -56,7 +64,7 @@ class _BillScreenState extends State<BillScreen> {
       if (!mounted) return;
       setState(() {
         _sale = sale;
-        _paidController.text = sale.paidAmount;
+        _paidController.text = _displayPaidAmount(sale.paidAmount);
         _error = null;
         _loading = false;
       });
@@ -115,7 +123,7 @@ class _BillScreenState extends State<BillScreen> {
       if (!mounted) return;
       setState(() {
         _sale = updated;
-        _paidController.text = updated.paidAmount;
+        _paidController.text = _displayPaidAmount(updated.paidAmount);
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(t('bill.paymentSaved'))),
@@ -170,7 +178,7 @@ class _BillScreenState extends State<BillScreen> {
       if (!mounted) return;
       setState(() {
         _sale = current;
-        _paidController.text = current.paidAmount;
+        _paidController.text = _displayPaidAmount(current.paidAmount);
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(t('bill.sentToPrinter'))),
@@ -233,8 +241,7 @@ class _BillScreenState extends State<BillScreen> {
                   children: [
                     BillReceiptCard(
                       settings: widget.businessSettings,
-                      billNumberLabel:
-                          t('bill.billNumber', {'id': sale!.id}),
+                      billNumberLabel: t('bill.billNumber', {'id': sale!.id}),
                       shopName: sale.shopName,
                       deliveryName: sale.deliveryGuyName,
                       saleDate: sale.saleDate,
@@ -251,11 +258,19 @@ class _BillScreenState extends State<BillScreen> {
                     const SizedBox(height: 16),
                     TextField(
                       controller: _paidController,
+                      focusNode: _paidFocus,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
+                      onTap: () {
+                        _paidController.selection = TextSelection(
+                          baseOffset: 0,
+                          extentOffset: _paidController.text.length,
+                        );
+                      },
                       decoration: InputDecoration(
                         labelText: t('bill.amountPaid'),
+                        hintText: '0.00',
                         helperText: t(
                           'bill.totalDueHelper',
                           {
