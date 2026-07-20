@@ -149,7 +149,6 @@ class _BillScreenState extends State<BillScreen> {
     if (sale == null || _printing) return;
     final localeController = LocaleScope.of(context);
     final t = localeController.t;
-    final locale = localeController.locale;
 
     setState(() => _printing = true);
     try {
@@ -168,7 +167,6 @@ class _BillScreenState extends State<BillScreen> {
         items: _lineItems(current),
         totalAmount: _todayTotal(current),
         t: t,
-        locale: locale,
         previousBalance: _previous(current),
         paidAmount: double.tryParse(current.paidAmount) ?? paid,
         remainingAfter: double.tryParse(current.remainingAfter),

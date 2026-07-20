@@ -195,6 +195,7 @@ const Map<String, String> stringsEn = {
   'bill.price': 'Price',
   'bill.total': 'Total',
   'bill.product': 'Product',
+  'bill.itemCalculation': '{price} × {qty} = {total}',
   'bill.previewBadge': 'Bill preview',
   'bill.addProductsHint': 'Add products to see bill lines',
   'bill.savingPayment': 'Saving payment...',

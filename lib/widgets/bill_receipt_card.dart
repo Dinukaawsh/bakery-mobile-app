@@ -217,31 +217,6 @@ class BillReceiptCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    SizedBox(
-                      width: 36,
-                      child: Text(
-                        t('bill.qty'),
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF57534E),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 72,
-                      child: Text(
-                        t('bill.total'),
-                        textAlign: TextAlign.right,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF57534E),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -260,29 +235,26 @@ class BillReceiptCard extends StatelessWidget {
                   ...items.map(
                     (item) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Text(
-                              item.productName,
-                              style: const TextStyle(fontSize: 12),
-                            ),
+                          Text(
+                            item.productName,
+                            style: const TextStyle(fontSize: 12),
                           ),
-                          SizedBox(
-                            width: 36,
+                          const SizedBox(height: 2),
+                          Align(
+                            alignment: Alignment.centerRight,
                             child: Text(
-                              '${item.quantity}',
-                              textAlign: TextAlign.right,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          SizedBox(
-                            width: 72,
-                            child: Text(
-                              formatCurrency(item.lineTotal),
-                              textAlign: TextAlign.right,
-                              style: const TextStyle(fontSize: 12),
+                              t('bill.itemCalculation', {
+                                'price': formatCurrency(item.unitPrice),
+                                'qty': item.quantity,
+                                'total': formatCurrency(item.lineTotal),
+                              }),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF57534E),
+                              ),
                             ),
                           ),
                         ],

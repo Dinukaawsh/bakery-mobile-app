@@ -3,7 +3,6 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-import '../l10n/app_locale.dart';
 import '../models/business_settings.dart';
 import '../utils/currency.dart';
 import '../widgets/bill_receipt_card.dart';
@@ -12,6 +11,45 @@ typedef BillTranslate = String Function(
   String key, [
   Map<String, Object?>? params,
 ]);
+
+enum _BillScript { latin, sinhala }
+
+class _BillTextRun {
+  const _BillTextRun(this.text, this.script);
+
+  final String text;
+  final _BillScript script;
+}
+
+List<_BillTextRun> _splitBillTextRuns(String text) {
+  if (text.isEmpty) return const [];
+
+  _BillScript scriptOf(int rune) {
+    if (rune >= 0x0D80 && rune <= 0x0DFF) return _BillScript.sinhala;
+    return _BillScript.latin;
+  }
+
+  final runs = <_BillTextRun>[];
+  final runes = text.runes.toList();
+  var currentScript = scriptOf(runes.first);
+  final buffer = StringBuffer();
+
+  for (final rune in runes) {
+    final script = scriptOf(rune);
+    if (script != currentScript && buffer.isNotEmpty) {
+      runs.add(_BillTextRun(buffer.toString(), currentScript));
+      buffer.clear();
+      currentScript = script;
+    }
+    buffer.writeCharCode(rune);
+  }
+
+  if (buffer.isNotEmpty) {
+    runs.add(_BillTextRun(buffer.toString(), currentScript));
+  }
+
+  return runs;
+}
 
 Future<void> printBillReceipt({
   required BusinessSettings settings,
@@ -22,7 +60,6 @@ Future<void> printBillReceipt({
   required List<BillLineItem> items,
   required double totalAmount,
   required BillTranslate t,
-  AppLocale locale = AppLocale.en,
   double previousBalance = 0,
   double paidAmount = 0,
   double? remainingAfter,
@@ -39,42 +76,75 @@ Future<void> printBillReceipt({
   );
   final sinhalaRegular = pw.Font.ttf(sinhalaRegularData);
   final sinhalaBold = pw.Font.ttf(sinhalaBoldData);
+  final latinRegular = pw.Font.helvetica();
+  final latinBold = pw.Font.helveticaBold();
 
-  pw.Font latinRegular;
-  pw.Font latinBold;
-  try {
-    latinRegular = await PdfGoogleFonts.notoSansRegular();
-    latinBold = await PdfGoogleFonts.notoSansBold();
-  } catch (_) {
-    latinRegular = sinhalaRegular;
-    latinBold = sinhalaBold;
-  }
-
-  final useSinhalaPrimary = locale == AppLocale.si;
-  final primaryRegular = useSinhalaPrimary ? sinhalaRegular : latinRegular;
-  final primaryBold = useSinhalaPrimary ? sinhalaBold : latinBold;
-
-  bool containsSinhala(String text) {
-    return text.runes.any((rune) => rune >= 0x0D80 && rune <= 0x0DFF);
-  }
-
-  pw.TextStyle styleFor(
-    String text, {
+  pw.TextStyle styleForScript(
+    _BillScript script, {
     double fontSize = 10,
     bool bold = false,
   }) {
-    final useSinhalaFont = useSinhalaPrimary || containsSinhala(text);
-    final font = useSinhalaFont
-        ? (bold ? sinhalaBold : sinhalaRegular)
-        : (bold ? latinBold : latinRegular);
+    final isSinhala = script == _BillScript.sinhala;
 
     return pw.TextStyle(
-      font: font,
+      font: isSinhala
+          ? (bold ? sinhalaBold : sinhalaRegular)
+          : (bold ? latinBold : latinRegular),
       fontSize: fontSize,
       fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-      lineSpacing: useSinhalaFont ? 1.45 : 1.2,
-      letterSpacing: useSinhalaFont ? 0.15 : 0,
+      lineSpacing: isSinhala ? 1.5 : 1.2,
+      letterSpacing: isSinhala ? 0.2 : 0,
     );
+  }
+
+  pw.Widget billText(
+    String text, {
+    double fontSize = 10,
+    bool bold = false,
+    pw.TextAlign? textAlign,
+  }) {
+    final runs = _splitBillTextRuns(text);
+    final style = runs.length == 1
+        ? styleForScript(
+            runs.first.script,
+            fontSize: fontSize,
+            bold: bold,
+          )
+        : null;
+
+    if (style != null) {
+      return pw.Text(
+        text,
+        style: style,
+        textAlign: textAlign,
+      );
+    }
+
+    return pw.RichText(
+      textAlign: textAlign ?? pw.TextAlign.left,
+      text: pw.TextSpan(
+        children: runs
+            .map(
+              (run) => pw.TextSpan(
+                text: run.text,
+                style: styleForScript(
+                  run.script,
+                  fontSize: fontSize,
+                  bold: bold,
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
+  String itemCalculation(BillLineItem item) {
+    return t('bill.itemCalculation', {
+      'price': formatCurrency(item.unitPrice),
+      'qty': item.quantity,
+      'total': formatCurrency(item.lineTotal),
+    });
   }
 
   final doc = pw.Document();
@@ -88,9 +158,9 @@ Future<void> printBillReceipt({
       pageFormat: PdfPageFormat.roll80,
       margin: const pw.EdgeInsets.all(12),
       theme: pw.ThemeData.withFont(
-        base: primaryRegular,
-        bold: primaryBold,
-        icons: primaryRegular,
+        base: latinRegular,
+        bold: latinBold,
+        icons: latinRegular,
       ),
       build: (context) {
         final telLabel = t('bill.tel', {'phone': settings.phone});
@@ -103,167 +173,115 @@ Future<void> printBillReceipt({
         final remainingLabel = t('bill.remaining');
         final thankYouLabel = t('bill.thankYou');
 
+        pw.Widget summaryRow(String label, String value, {bool bold = false}) {
+          return pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Expanded(child: billText(label, bold: bold)),
+              pw.SizedBox(width: 8),
+              billText(value, bold: bold),
+            ],
+          );
+        }
+
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Center(
-              child: pw.Text(
+              child: billText(
                 settings.businessName,
-                style: styleFor(
-                  settings.businessName,
-                  fontSize: 14,
-                  bold: true,
-                ),
+                fontSize: 14,
+                bold: true,
                 textAlign: pw.TextAlign.center,
               ),
             ),
             if (settings.ownerName != null && settings.ownerName!.isNotEmpty)
               pw.Center(
-                child: pw.Text(
+                child: billText(
                   settings.ownerName!,
-                  style: styleFor(settings.ownerName!, fontSize: 9),
+                  fontSize: 9,
                   textAlign: pw.TextAlign.center,
                 ),
               ),
             if (settings.address.isNotEmpty)
               pw.Center(
-                child: pw.Text(
+                child: billText(
                   settings.address,
-                  style: styleFor(settings.address, fontSize: 9),
+                  fontSize: 9,
                   textAlign: pw.TextAlign.center,
                 ),
               ),
             if (settings.phone.isNotEmpty)
               pw.Center(
-                child: pw.Text(
+                child: billText(
                   telLabel,
-                  style: styleFor(telLabel, fontSize: 9),
+                  fontSize: 9,
+                  textAlign: pw.TextAlign.center,
                 ),
               ),
             pw.SizedBox(height: 6),
             pw.Center(
-              child: pw.Text(
+              child: billText(
                 billNumberLabel,
-                style: styleFor(billNumberLabel, bold: true),
+                bold: true,
+                textAlign: pw.TextAlign.center,
               ),
             ),
             pw.Divider(),
-            pw.Text(shopLabel, style: styleFor(shopLabel, bold: true)),
-            pw.Text(shopName, style: styleFor(shopName)),
-            if (shopOwner != null && shopOwner.isNotEmpty)
-              pw.Text(shopOwner, style: styleFor(shopOwner)),
+            billText(shopLabel, bold: true),
+            billText(shopName),
+            if (shopOwner != null && shopOwner.isNotEmpty) billText(shopOwner),
             if (shopAddress != null && shopAddress.isNotEmpty)
-              pw.Text(shopAddress, style: styleFor(shopAddress)),
-            if (shopPhone != null && shopPhone.isNotEmpty)
-              pw.Text(shopPhone, style: styleFor(shopPhone)),
+              billText(shopAddress),
+            if (shopPhone != null && shopPhone.isNotEmpty) billText(shopPhone),
             pw.SizedBox(height: 6),
-            pw.Text(
-              deliveryLabel,
-              style: styleFor(deliveryLabel, bold: true),
-            ),
-            pw.Text(deliveryName, style: styleFor(deliveryName)),
-            pw.Text(dateLabel, style: styleFor(dateLabel)),
+            billText(deliveryLabel, bold: true),
+            billText(deliveryName),
+            billText(dateLabel),
             pw.SizedBox(height: 6),
             pw.Divider(),
             for (final item in items)
               pw.Padding(
-                padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                child: pw.Row(
+                padding: const pw.EdgeInsets.symmetric(vertical: 3),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Expanded(
-                      child: pw.Text(
-                        item.productName,
-                        style: styleFor(item.productName),
+                    billText(item.productName),
+                    pw.SizedBox(height: 2),
+                    pw.Align(
+                      alignment: pw.Alignment.centerRight,
+                      child: billText(
+                        itemCalculation(item),
+                        fontSize: 9,
                       ),
-                    ),
-                    pw.Text(
-                      '${item.quantity}',
-                      style: styleFor('${item.quantity}'),
-                    ),
-                    pw.SizedBox(width: 8),
-                    pw.Text(
-                      formatCurrency(item.lineTotal),
-                      style: styleFor(formatCurrency(item.lineTotal)),
                     ),
                   ],
                 ),
               ),
             pw.Divider(),
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text(
-                  todaysDropLabel,
-                  style: styleFor(todaysDropLabel),
-                ),
-                pw.Text(
-                  formatCurrency(totalAmount),
-                  style: styleFor(formatCurrency(totalAmount)),
-                ),
-              ],
-            ),
+            summaryRow(todaysDropLabel, formatCurrency(totalAmount)),
             if (previousBalance > 0)
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text(
-                    previousUnpaidLabel,
-                    style: styleFor(previousUnpaidLabel),
-                  ),
-                  pw.Text(
-                    formatCurrency(previousBalance),
-                    style: styleFor(formatCurrency(previousBalance)),
-                  ),
-                ],
+              summaryRow(
+                previousUnpaidLabel,
+                formatCurrency(previousBalance),
               ),
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text(
-                  totalDueLabel,
-                  style: styleFor(totalDueLabel, bold: true),
-                ),
-                pw.Text(
-                  formatCurrency(amountDue),
-                  style: styleFor(formatCurrency(amountDue), bold: true),
-                ),
-              ],
-            ),
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text(paidLabel, style: styleFor(paidLabel)),
-                pw.Text(
-                  formatCurrency(paidAmount),
-                  style: styleFor(formatCurrency(paidAmount)),
-                ),
-              ],
-            ),
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text(
-                  remainingLabel,
-                  style: styleFor(remainingLabel, bold: true),
-                ),
-                pw.Text(
-                  formatCurrency(remaining),
-                  style: styleFor(formatCurrency(remaining), bold: true),
-                ),
-              ],
+            summaryRow(totalDueLabel, formatCurrency(amountDue), bold: true),
+            summaryRow(paidLabel, formatCurrency(paidAmount)),
+            summaryRow(
+              remainingLabel,
+              formatCurrency(remaining),
+              bold: true,
             ),
             if (notes != null && notes.isNotEmpty) ...[
               pw.SizedBox(height: 6),
-              pw.Text(
-                t('bill.notes', {'notes': notes}),
-                style: styleFor(t('bill.notes', {'notes': notes})),
-              ),
+              billText(t('bill.notes', {'notes': notes})),
             ],
             pw.SizedBox(height: 10),
             pw.Center(
-              child: pw.Text(
+              child: billText(
                 thankYouLabel,
-                style: styleFor(thankYouLabel, fontSize: 8),
+                fontSize: 8,
                 textAlign: pw.TextAlign.center,
               ),
             ),

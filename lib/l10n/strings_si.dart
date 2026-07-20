@@ -195,6 +195,7 @@ const Map<String, String> stringsSi = {
   'bill.price': 'මිල',
   'bill.total': 'මුළු',
   'bill.product': 'නිෂ්පාදනය',
+  'bill.itemCalculation': '{price} × {qty} = {total}',
   'bill.previewBadge': 'බිල්පත් පෙරදසුන',
   'bill.addProductsHint': 'බිල්පත් පේළි දැකීමට නිෂ්පාදන එකතු කරන්න',
   'bill.savingPayment': 'ගෙවීම සුරකිමින්...',
