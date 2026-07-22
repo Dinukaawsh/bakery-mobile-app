@@ -1251,6 +1251,7 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
   List<AllocationSummary> _summary = [];
   List<DeliveryPartner> _partners = [];
   List<Product> _products = [];
+  List<PendingDriverStock> _pendingStock = [];
   String? _error;
   String _date = localDateString();
   String? _partnerFilter;
@@ -1258,6 +1259,10 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
   String? _assignPartnerId;
   final Map<int, int> _assignQty = {};
   bool _saving = false;
+  int? _resettingId;
+
+  Set<int> get _pendingGuyIds =>
+      _pendingStock.map((row) => row.deliveryGuyId).toSet();
 
   List<_PartnerAssignmentGroup> get _grouped {
     final map = <int, _PartnerAssignmentGroup>{};
@@ -1426,14 +1431,18 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
 
   Future<void> _load() async {
     try {
-      final data = await widget.apiService.fetchAdminAllocations(
+      final dataFuture = widget.apiService.fetchAdminAllocations(
         date: _date,
         deliveryGuyId:
             _partnerFilter == null ? null : int.tryParse(_partnerFilter!),
       );
+      final pendingFuture = widget.apiService.fetchPendingUnsoldStock();
+      final data = await dataFuture;
+      final pending = await pendingFuture;
       if (!mounted) return;
       setState(() {
         _summary = data.summary;
+        _pendingStock = pending;
         _error = null;
       });
     } catch (error) {
@@ -1442,11 +1451,43 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
     }
   }
 
+  Future<void> _resetUnsold(PendingDriverStock driver) async {
+    final t = LocaleScope.of(context).t;
+    setState(() => _resettingId = driver.deliveryGuyId);
+    try {
+      await widget.apiService.resetDriverUnsoldStock(driver.deliveryGuyId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            t('admin.resetUnsoldSuccess', {'name': driver.deliveryGuyName}),
+          ),
+        ),
+      );
+      final products = await widget.apiService.fetchProducts();
+      if (!mounted) return;
+      setState(() => _products = products);
+      await _load();
+    } catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error = error.toString().replaceFirst('Exception: ', ''),
+      );
+    } finally {
+      if (mounted) setState(() => _resettingId = null);
+    }
+  }
+
   Future<void> _submitAssignment() async {
     final t = LocaleScope.of(context).t;
     final partnerId = int.tryParse(_assignPartnerId ?? '');
     if (partnerId == null) {
       setState(() => _error = t('admin.selectPartner'));
+      return;
+    }
+
+    if (_pendingGuyIds.contains(partnerId)) {
+      setState(() => _error = t('admin.resetBeforeAssign'));
       return;
     }
 
@@ -1540,6 +1581,94 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
                 ],
               ),
             ),
+            if (_pendingStock.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFCD34D)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            t('admin.pendingUnsoldTitle'),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF78350F),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            t('admin.pendingUnsoldHint'),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF92400E),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ..._pendingStock.map((driver) {
+                      return Card(
+                        margin: const EdgeInsets.only(top: 8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                driver.deliveryGuyName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              ...driver.items.map(
+                                (item) => Text(
+                                  t('admin.pendingUnsoldLine', {
+                                    'date': item.businessDate,
+                                    'name': item.productName,
+                                    'qty': item.quantity,
+                                  }),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF57534E),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: FilledButton(
+                                  onPressed:
+                                      _resettingId == driver.deliveryGuyId
+                                          ? null
+                                          : () => _resetUnsold(driver),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xFFB45309),
+                                  ),
+                                  child: Text(
+                                    _resettingId == driver.deliveryGuyId
+                                        ? t('admin.resettingUnsold')
+                                        : t('admin.resetUnsold'),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.all(12),
@@ -1650,7 +1779,11 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
                                     .map(
                                       (partner) => DropdownMenuItem<String?>(
                                         value: partner.id.toString(),
-                                        child: Text(partner.name),
+                                        child: Text(
+                                          _pendingGuyIds.contains(partner.id)
+                                              ? '${partner.name}${t('admin.resetRequiredSuffix')}'
+                                              : partner.name,
+                                        ),
                                       ),
                                     )
                                     .toList(),

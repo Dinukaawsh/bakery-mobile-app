@@ -266,6 +266,27 @@ class ApiService {
         .toList();
   }
 
+  Future<List<PendingDriverStock>> fetchPendingUnsoldStock() async {
+    final response = await _client.get(
+      Uri.parse('$_baseUrl/api/stock-closures/pending'),
+      headers: _headers(),
+    );
+    final data = await _decode(response);
+    return ((data['pending'] as List?) ?? [])
+        .map(
+          (item) => PendingDriverStock.fromJson(item as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  Future<void> resetDriverUnsoldStock(int deliveryGuyId) async {
+    await _client.post(
+      Uri.parse('$_baseUrl/api/stock-closures'),
+      headers: _headers(),
+      body: jsonEncode({'deliveryGuyId': deliveryGuyId}),
+    ).then(_decode);
+  }
+
   Future<Shop> createShop({
     required String name,
     required String ownerName,

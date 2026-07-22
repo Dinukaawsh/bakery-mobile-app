@@ -101,3 +101,58 @@ class ReturnableProduct {
     );
   }
 }
+
+class PendingUnsoldLine {
+  final String businessDate;
+  final int productId;
+  final String productName;
+  final int quantity;
+
+  const PendingUnsoldLine({
+    required this.businessDate,
+    required this.productId,
+    required this.productName,
+    required this.quantity,
+  });
+
+  factory PendingUnsoldLine.fromJson(Map<String, dynamic> json) {
+    return PendingUnsoldLine(
+      businessDate: json['businessDate'] as String,
+      productId: json['productId'] as int,
+      productName: json['productName'] as String,
+      quantity: json['quantity'] as int,
+    );
+  }
+}
+
+class PendingDriverStock {
+  final int deliveryGuyId;
+  final String deliveryGuyName;
+  final List<String> dates;
+  final List<PendingUnsoldLine> items;
+  final int totalRemaining;
+
+  const PendingDriverStock({
+    required this.deliveryGuyId,
+    required this.deliveryGuyName,
+    required this.dates,
+    required this.items,
+    required this.totalRemaining,
+  });
+
+  factory PendingDriverStock.fromJson(Map<String, dynamic> json) {
+    return PendingDriverStock(
+      deliveryGuyId: json['deliveryGuyId'] as int,
+      deliveryGuyName: json['deliveryGuyName'] as String,
+      dates: ((json['dates'] as List?) ?? [])
+          .map((item) => item.toString())
+          .toList(),
+      items: ((json['items'] as List?) ?? [])
+          .map(
+            (item) => PendingUnsoldLine.fromJson(item as Map<String, dynamic>),
+          )
+          .toList(),
+      totalRemaining: json['totalRemaining'] as int? ?? 0,
+    );
+  }
+}
