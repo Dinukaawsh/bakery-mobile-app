@@ -1229,6 +1229,24 @@ class _AdminAssignmentsPage extends StatefulWidget {
   State<_AdminAssignmentsPage> createState() => _AdminAssignmentsPageState();
 }
 
+class _PartnerAssignmentGroup {
+  _PartnerAssignmentGroup({
+    required this.deliveryGuyId,
+    required this.deliveryGuyName,
+    required this.items,
+    required this.totalAllocated,
+    required this.totalSold,
+    required this.totalRemaining,
+  });
+
+  final int deliveryGuyId;
+  final String deliveryGuyName;
+  final List<AllocationSummary> items;
+  int totalAllocated;
+  int totalSold;
+  int totalRemaining;
+}
+
 class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
   List<AllocationSummary> _summary = [];
   List<DeliveryPartner> _partners = [];
@@ -1240,6 +1258,152 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
   String? _assignPartnerId;
   final Map<int, int> _assignQty = {};
   bool _saving = false;
+
+  List<_PartnerAssignmentGroup> get _grouped {
+    final map = <int, _PartnerAssignmentGroup>{};
+    for (final row in _summary) {
+      final existing = map[row.deliveryGuyId];
+      if (existing != null) {
+        existing.items.add(row);
+        existing.totalAllocated += row.allocated;
+        existing.totalSold += row.sold;
+        existing.totalRemaining += row.remaining;
+        continue;
+      }
+      map[row.deliveryGuyId] = _PartnerAssignmentGroup(
+        deliveryGuyId: row.deliveryGuyId,
+        deliveryGuyName: row.deliveryGuyName,
+        items: [row],
+        totalAllocated: row.allocated,
+        totalSold: row.sold,
+        totalRemaining: row.remaining,
+      );
+    }
+    final groups = map.values.toList()
+      ..sort(
+        (a, b) => a.deliveryGuyName.toLowerCase().compareTo(
+              b.deliveryGuyName.toLowerCase(),
+            ),
+      );
+    return groups;
+  }
+
+  void _showPartnerDetails(_PartnerAssignmentGroup group) {
+    final t = LocaleScope.of(context).t;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  t('admin.assignmentDetails'),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  group.deliveryGuyName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1C1917),
+                  ),
+                ),
+                Text(
+                  _date,
+                  style: const TextStyle(color: Color(0xFF78716C)),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _assignmentStatChip(
+                        t('admin.given', {'count': group.totalAllocated}),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _assignmentStatChip(
+                        t('admin.sold', {'count': group.totalSold}),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _assignmentStatChip(
+                        t('admin.left', {'count': group.totalRemaining}),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  t('admin.productCount', {'count': group.items.length}),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF44403C),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(context).height * 0.45,
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: group.items.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final item = group.items[index];
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          item.productName,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          '${t('admin.given', {'count': item.allocated})}  ·  '
+                          '${t('admin.sold', {'count': item.sold})}  ·  '
+                          '${t('admin.left', {'count': item.remaining})}',
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _assignmentStatChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFDBA74)),
+      ),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF92400E),
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -1384,7 +1548,7 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _load,
-                child: _summary.isEmpty
+                child: _grouped.isEmpty
                     ? ListView(
                         children: [
                           const SizedBox(height: 120),
@@ -1393,34 +1557,46 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.only(bottom: 88),
-                        itemCount: _summary.length,
+                        itemCount: _grouped.length,
                         itemBuilder: (context, index) {
-                          final row = _summary[index];
+                          final group = _grouped[index];
+                          final preview = group.items
+                              .take(3)
+                              .map((item) => item.productName)
+                              .join(', ');
+                          final more =
+                              group.items.length > 3 ? '…' : '';
                           return Card(
                             margin: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 6,
                             ),
                             child: ListTile(
-                              title: Text(row.productName),
-                              subtitle: Text(row.deliveryGuyName),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    t(
-                                      'admin.given',
-                                      {'count': row.allocated},
-                                    ),
-                                  ),
-                                  Text(
-                                    t(
-                                      'admin.left',
-                                      {'count': row.remaining},
-                                    ),
-                                  ),
-                                ],
+                              onTap: () => _showPartnerDetails(group),
+                              title: Text(
+                                group.deliveryGuyName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${t('admin.productCount', {
+                                      'count': group.items.length,
+                                    })} · $preview$more\n'
+                                '${t('admin.given', {
+                                      'count': group.totalAllocated,
+                                    })}  ·  '
+                                '${t('admin.sold', {
+                                      'count': group.totalSold,
+                                    })}  ·  '
+                                '${t('admin.left', {
+                                      'count': group.totalRemaining,
+                                    })}',
+                              ),
+                              isThreeLine: true,
+                              trailing: const Icon(
+                                Icons.chevron_right,
+                                color: Color(0xFFB45309),
                               ),
                             ),
                           );

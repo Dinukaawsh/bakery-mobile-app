@@ -1,7 +1,7 @@
 name: bakery_mobile
 description: Flutter mobile client for the Bakery delivery platform.
 publish_to: "none"
-version: 1.0.12+13
+version: 1.0.14+15
 
 environment:
   sdk: ">=3.5.0 <4.0.0"

@@ -230,11 +230,11 @@ class ApiService {
         .toList();
   }
 
-  Future<List<Product>> fetchProducts() async {
-    final response = await _client.get(
-      Uri.parse('$_baseUrl/api/products'),
-      headers: _headers(),
+  Future<List<Product>> fetchProducts({bool includeInactive = false}) async {
+    final uri = Uri.parse('$_baseUrl/api/products').replace(
+      queryParameters: includeInactive ? {'includeInactive': 'true'} : null,
     );
+    final response = await _client.get(uri, headers: _headers());
     final data = await _decode(response);
     return (data['products'] as List)
         .map((item) => Product.fromJson(item as Map<String, dynamic>))
@@ -249,6 +249,20 @@ class ApiService {
     final data = await _decode(response);
     return (data['shops'] as List)
         .map((item) => Shop.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<ReturnableProduct>> fetchShopReturnable(int shopId) async {
+    final response = await _client.get(
+      Uri.parse('$_baseUrl/api/shops/$shopId/returnable'),
+      headers: _headers(),
+    );
+    final data = await _decode(response);
+    return ((data['products'] as List?) ?? [])
+        .map(
+          (item) =>
+              ReturnableProduct.fromJson(item as Map<String, dynamic>),
+        )
         .toList();
   }
 

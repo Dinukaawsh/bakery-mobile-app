@@ -7,6 +7,8 @@ class Sale {
   final String previousBalance;
   final String paidAmount;
   final String remainingAfter;
+  final String returnsAmount;
+  final String netToday;
   final String amountDue;
   final String? notes;
   final bool billPrinted;
@@ -16,6 +18,7 @@ class Sale {
   final String? shopAddress;
   final String? shopPhone;
   final List<SaleItem> items;
+  final List<SaleItem> returns;
 
   const Sale({
     required this.id,
@@ -26,6 +29,8 @@ class Sale {
     required this.previousBalance,
     required this.paidAmount,
     required this.remainingAfter,
+    required this.returnsAmount,
+    required this.netToday,
     required this.amountDue,
     required this.notes,
     required this.billPrinted,
@@ -35,17 +40,24 @@ class Sale {
     this.shopAddress,
     this.shopPhone,
     this.items = const [],
+    this.returns = const [],
   });
 
   factory Sale.fromJson(Map<String, dynamic> json) {
     final rawItems = json['items'];
+    final rawReturns = json['returns'];
     final total = json['totalAmount']?.toString() ?? '0';
     final previous = json['previousBalance']?.toString() ?? '0';
     final paid = json['paidAmount']?.toString() ?? '0';
     final remaining = json['remainingAfter']?.toString() ?? '0';
+    final returnsAmt = json['returnsAmount']?.toString() ?? '0';
+    final totalNum = double.tryParse(total) ?? 0;
+    final previousNum = double.tryParse(previous) ?? 0;
+    final returnsNum = double.tryParse(returnsAmt) ?? 0;
+    final net = json['netToday']?.toString() ??
+        (totalNum - returnsNum).toStringAsFixed(2);
     final due = json['amountDue']?.toString() ??
-        ((double.tryParse(previous) ?? 0) + (double.tryParse(total) ?? 0))
-            .toStringAsFixed(2);
+        (previousNum + totalNum - returnsNum).toStringAsFixed(2);
 
     return Sale(
       id: json['id'] as int,
@@ -56,6 +68,8 @@ class Sale {
       previousBalance: previous,
       paidAmount: paid,
       remainingAfter: remaining,
+      returnsAmount: returnsAmt,
+      netToday: net,
       amountDue: due,
       notes: json['notes'] as String?,
       billPrinted: json['billPrinted'] as bool? ?? false,
@@ -66,6 +80,11 @@ class Sale {
       shopPhone: json['shopPhone'] as String?,
       items: rawItems is List
           ? rawItems
+              .map((item) => SaleItem.fromJson(item as Map<String, dynamic>))
+              .toList()
+          : const [],
+      returns: rawReturns is List
+          ? rawReturns
               .map((item) => SaleItem.fromJson(item as Map<String, dynamic>))
               .toList()
           : const [],
@@ -86,6 +105,8 @@ class Sale {
       previousBalance: previousBalance,
       paidAmount: paidAmount ?? this.paidAmount,
       remainingAfter: remainingAfter ?? this.remainingAfter,
+      returnsAmount: returnsAmount,
+      netToday: netToday,
       amountDue: amountDue,
       notes: notes,
       billPrinted: billPrinted ?? this.billPrinted,
@@ -95,6 +116,7 @@ class Sale {
       shopAddress: shopAddress,
       shopPhone: shopPhone,
       items: items,
+      returns: returns,
     );
   }
 }
@@ -134,6 +156,7 @@ class SaleInput {
   final String? notes;
   final double? paidAmount;
   final List<Map<String, int>> items;
+  final List<Map<String, int>> returns;
 
   const SaleInput({
     required this.shopId,
@@ -141,6 +164,7 @@ class SaleInput {
     this.notes,
     this.paidAmount,
     required this.items,
+    this.returns = const [],
   });
 
   Map<String, dynamic> toJson() {
@@ -150,6 +174,7 @@ class SaleInput {
       if (notes != null && notes!.isNotEmpty) 'notes': notes,
       if (paidAmount != null) 'paidAmount': paidAmount,
       'items': items,
+      if (returns.isNotEmpty) 'returns': returns,
     };
   }
 }

@@ -28,6 +28,8 @@ class BillReceiptCard extends StatelessWidget {
     required this.saleDate,
     required this.items,
     required this.totalAmount,
+    this.returns = const [],
+    this.returnsAmount = 0,
     this.previousBalance = 0,
     this.paidAmount = 0,
     this.remainingAfter,
@@ -44,7 +46,9 @@ class BillReceiptCard extends StatelessWidget {
   final String deliveryName;
   final DateTime saleDate;
   final List<BillLineItem> items;
+  final List<BillLineItem> returns;
   final double totalAmount;
+  final double returnsAmount;
   final double previousBalance;
   final double paidAmount;
   final double? remainingAfter;
@@ -54,7 +58,8 @@ class BillReceiptCard extends StatelessWidget {
   final String? notes;
   final bool isPreview;
 
-  double get amountDue => previousBalance + totalAmount;
+  double get netToday => totalAmount - returnsAmount;
+  double get amountDue => previousBalance + netToday;
   double get remaining =>
       remainingAfter ?? (amountDue - paidAmount).clamp(0, double.infinity);
 
@@ -262,7 +267,64 @@ class BillReceiptCard extends StatelessWidget {
                     ),
                   ),
                 const Divider(height: 20, color: Color(0xFFE7E5E4)),
+                if (returns.isNotEmpty) ...[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      t('bill.returnsCollected'),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFB91C1C),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  ...returns.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.productName,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          const SizedBox(height: 2),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              t('bill.itemCalculation', {
+                                'price': formatCurrency(item.unitPrice),
+                                'qty': item.quantity,
+                                'total': formatCurrency(item.lineTotal),
+                              }),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFFB91C1C),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 20, color: Color(0xFFE7E5E4)),
+                ],
                 _summaryRow(t('bill.todaysDrop'), formatCurrency(totalAmount)),
+                if (returnsAmount > 0) ...[
+                  _summaryRow(
+                    t('bill.returnsCredit'),
+                    '-${formatCurrency(returnsAmount)}',
+                    color: const Color(0xFFB91C1C),
+                  ),
+                  _summaryRow(
+                    t('bill.estimatedLoss'),
+                    formatCurrency(returnsAmount),
+                    color: const Color(0xFFB91C1C),
+                  ),
+                  _summaryRow(t('bill.netToday'), formatCurrency(netToday)),
+                ],
                 if (previousBalance > 0)
                   _summaryRow(
                     t('bill.previousUnpaid'),

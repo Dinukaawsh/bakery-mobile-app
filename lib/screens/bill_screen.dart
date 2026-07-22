@@ -89,15 +89,33 @@ class _BillScreenState extends State<BillScreen> {
         .toList();
   }
 
+  List<BillLineItem> _returnItems(Sale sale) {
+    return sale.returns
+        .map(
+          (item) => BillLineItem(
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: double.tryParse(item.unitPrice) ?? 0,
+          ),
+        )
+        .toList();
+  }
+
   double _todayTotal(Sale sale) {
     return double.tryParse(sale.totalAmount) ??
         _lineItems(sale).fold(0, (sum, item) => sum + item.lineTotal);
   }
 
+  double _returnsAmount(Sale sale) {
+    return double.tryParse(sale.returnsAmount) ??
+        _returnItems(sale).fold(0, (sum, item) => sum + item.lineTotal);
+  }
+
   double _previous(Sale sale) => double.tryParse(sale.previousBalance) ?? 0;
 
   double _amountDue(Sale sale) =>
-      double.tryParse(sale.amountDue) ?? (_previous(sale) + _todayTotal(sale));
+      double.tryParse(sale.amountDue) ??
+      (_previous(sale) + _todayTotal(sale) - _returnsAmount(sale));
 
   double get _paidPreview {
     final sale = _sale;
@@ -165,7 +183,9 @@ class _BillScreenState extends State<BillScreen> {
         deliveryName: current.deliveryGuyName,
         saleDate: current.saleDate,
         items: _lineItems(current),
+        returns: _returnItems(current),
         totalAmount: _todayTotal(current),
+        returnsAmount: _returnsAmount(current),
         t: t,
         previousBalance: _previous(current),
         paidAmount: double.tryParse(current.paidAmount) ?? paid,
@@ -251,7 +271,9 @@ class _BillScreenState extends State<BillScreen> {
                       deliveryName: sale.deliveryGuyName,
                       saleDate: sale.saleDate,
                       items: _lineItems(sale),
+                      returns: _returnItems(sale),
                       totalAmount: _todayTotal(sale),
+                      returnsAmount: _returnsAmount(sale),
                       previousBalance: _previous(sale),
                       paidAmount: _paidPreview,
                       remainingAfter: _amountDue(sale) - _paidPreview,

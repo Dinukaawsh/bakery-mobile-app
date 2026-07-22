@@ -23,10 +23,13 @@ import '../widgets/confirm_dialog.dart';
 import '../widgets/locale_toggle.dart';
 import '../widgets/notifications_bell_button.dart';
 import '../widgets/notifications_screen.dart';
+import '../widgets/app_toast.dart';
+import '../widgets/qty_stepper.dart';
 import '../widgets/chat_screen.dart';
 import '../widgets/chat_unread_listener.dart';
 import 'account_settings_screen.dart';
 import 'add_shop_screen.dart';
+import 'return_items_screen.dart';
 
 class DeliveryHomeScreen extends StatefulWidget {
   const DeliveryHomeScreen({
@@ -1233,7 +1236,12 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
   late List<Shop> _shops;
   Shop? _selectedShop;
   String? _routeFilter;
+
+  /// null = choose mode, true = existing shop, false unused — use enum-like:
+  /// 'choice' | 'existing'
+  String _shopStep = 'choice';
   final Map<int, int> _quantities = {};
+  final Map<int, int> _returnQuantities = {};
   final _notesController = TextEditingController();
   List<Product> _products = [];
   List<AllocationSummary> _allocations = [];
@@ -1291,7 +1299,9 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
 
   Future<void> _loadProducts() async {
     try {
-      final products = await widget.apiService.fetchProducts();
+      final products = await widget.apiService.fetchProducts(
+        includeInactive: true,
+      );
       if (!mounted) return;
       setState(() {
         _products = products;
@@ -1335,8 +1345,40 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     return items;
   }
 
+  List<BillLineItem> get _previewReturns {
+    final items = <BillLineItem>[];
+    for (final entry in _returnQuantities.entries) {
+      if (entry.value <= 0) continue;
+      final product = _productMap[entry.key];
+      AllocationSummary? allocation;
+      for (final item in _allocations) {
+        if (item.productId == entry.key) {
+          allocation = item;
+          break;
+        }
+      }
+      final name = product?.name ?? allocation?.productName ?? 'Product';
+      final price = double.tryParse(
+            product?.price ?? allocation?.productPrice ?? '0',
+          ) ??
+          0;
+      items.add(
+        BillLineItem(
+          productName: name,
+          quantity: entry.value,
+          unitPrice: price,
+        ),
+      );
+    }
+    return items;
+  }
+
   double get _previewTotal {
     return _previewItems.fold(0, (sum, item) => sum + item.lineTotal);
+  }
+
+  double get _previewReturnsTotal {
+    return _previewReturns.fold(0, (sum, item) => sum + item.lineTotal);
   }
 
   @override
@@ -1355,8 +1397,39 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     setState(() {
       _shops = [..._shops, shop];
       _selectedShop = shop;
+      _shopStep = 'existing';
     });
   }
+
+  Future<void> _openReturnItems() async {
+    final t = LocaleScope.of(context).t;
+    final shop = _selectedShop;
+    if (shop == null) {
+      setState(() => _error = t('delivery.selectShopForReturns'));
+      showAppToast(context, t('delivery.selectShopForReturns'), isError: true);
+      return;
+    }
+
+    final result = await Navigator.of(context).push<Map<int, int>>(
+      MaterialPageRoute(
+        builder: (_) => ReturnItemsScreen(
+          apiService: widget.apiService,
+          shopId: shop.id,
+          initialQuantities: Map<int, int>.from(_returnQuantities),
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _returnQuantities
+        ..clear()
+        ..addAll(result);
+      _error = null;
+    });
+  }
+
+  int get _returnLineCount =>
+      _returnQuantities.values.where((qty) => qty > 0).length;
 
   Future<void> _submit() async {
     final t = LocaleScope.of(context).t;
@@ -1370,8 +1443,13 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
         .map((entry) => {'productId': entry.key, 'quantity': entry.value})
         .toList();
 
-    if (items.isEmpty) {
-      setState(() => _error = t('delivery.addAtLeastOneProduct'));
+    final returns = _returnQuantities.entries
+        .where((entry) => entry.value > 0)
+        .map((entry) => {'productId': entry.key, 'quantity': entry.value})
+        .toList();
+
+    if (items.isEmpty && returns.isEmpty) {
+      setState(() => _error = t('delivery.addDropOrReturn'));
       return;
     }
 
@@ -1387,6 +1465,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
           saleDate: localDateString(),
           notes: _notesController.text.trim(),
           items: items,
+          returns: returns,
         ),
       );
       if (!mounted) return;
@@ -1446,81 +1525,113 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
       body: ListView(
         padding: listPaddingWithSystemBottom(context, bottomBase: 24),
         children: [
-          if (_routeOptions.isNotEmpty) ...[
-            DropdownButtonFormField<String?>(
-              value: _routeFilter,
-              decoration: InputDecoration(
-                labelText: t('delivery.filterByRoute'),
-                border: const OutlineInputBorder(),
-              ),
-              items: [
-                DropdownMenuItem<String?>(
-                  value: null,
-                  child: Text(t('delivery.allRoutes')),
-                ),
-                ..._routeOptions.map(
-                  (route) => DropdownMenuItem<String?>(
-                    value: route,
-                    child: Text(route),
-                  ),
-                ),
-              ],
-              onChanged: (value) {
-                setState(() {
-                  _routeFilter = value;
-                  if (_selectedShop != null &&
-                      !_filteredShops.contains(_selectedShop)) {
-                    _selectedShop = null;
-                  }
-                });
-              },
+          if (_shopStep == 'choice') ...[
+            Text(
+              t('delivery.selectShop'),
+              style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
-          ],
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<Shop>(
-                  value: _selectedShop,
-                  decoration: InputDecoration(
-                    labelText: t('common.shop'),
-                    border: const OutlineInputBorder(),
-                  ),
-                  items: _filteredShops
-                      .map(
-                        (shop) => DropdownMenuItem(
-                          value: shop,
-                          child: Text(
-                            () {
-                              final route =
-                                  shop.route == null || shop.route!.isEmpty
-                                      ? ''
-                                      : ' (${shop.route})';
-                              final owes = shop.outstandingAsDouble > 0
-                                  ? ' • ${t('delivery.owes', {
-                                          'amount': shop.outstandingBalance,
-                                        })}'
-                                  : '';
-                              return '${shop.name}$route$owes';
-                            }(),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (shop) => setState(() => _selectedShop = shop),
-                ),
+            FilledButton.icon(
+              onPressed: () => setState(() => _shopStep = 'existing'),
+              icon: const Icon(Icons.storefront_outlined),
+              label: Text(t('delivery.useExistingShop')),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFB45309),
+                minimumSize: const Size.fromHeight(48),
               ),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _openAddShop,
+              icon: const Icon(Icons.add_business_outlined),
+              label: Text(t('delivery.addNewShop')),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFB45309),
+                side: const BorderSide(color: Color(0xFFFDE68A)),
+                minimumSize: const Size.fromHeight(48),
+              ),
+            ),
+            if (_shops.isEmpty) ...[
+              const SizedBox(height: 8),
+              Text(t('delivery.noShopsYet')),
             ],
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _openAddShop,
-            icon: const Icon(Icons.add_business_outlined),
-            label: Text(t('delivery.addNewShop')),
-          ),
-          if (_shops.isEmpty) ...[
-            const SizedBox(height: 8),
-            Text(t('delivery.noShopsYet')),
+          ] else ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => setState(() {
+                  _shopStep = 'choice';
+                  _selectedShop = null;
+                  _returnQuantities.clear();
+                }),
+                icon: const Icon(Icons.arrow_back, size: 18),
+                label: Text(t('delivery.changeShopChoice')),
+              ),
+            ),
+            if (_routeOptions.isNotEmpty) ...[
+              DropdownButtonFormField<String?>(
+                value: _routeFilter,
+                decoration: InputDecoration(
+                  labelText: t('delivery.filterByRoute'),
+                  border: const OutlineInputBorder(),
+                ),
+                items: [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text(t('delivery.allRoutes')),
+                  ),
+                  ..._routeOptions.map(
+                    (route) => DropdownMenuItem<String?>(
+                      value: route,
+                      child: Text(route),
+                    ),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _routeFilter = value;
+                    if (_selectedShop != null &&
+                        !_filteredShops.contains(_selectedShop)) {
+                      _selectedShop = null;
+                      _returnQuantities.clear();
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+            DropdownButtonFormField<Shop>(
+              value: _selectedShop,
+              decoration: InputDecoration(
+                labelText: t('common.shop'),
+                border: const OutlineInputBorder(),
+              ),
+              items: _filteredShops
+                  .map(
+                    (shop) => DropdownMenuItem(
+                      value: shop,
+                      child: Text(
+                        () {
+                          final route =
+                              shop.route == null || shop.route!.isEmpty
+                                  ? ''
+                                  : ' (${shop.route})';
+                          final owes = shop.outstandingAsDouble > 0
+                              ? ' • ${t('delivery.owes', {
+                                      'amount': shop.outstandingBalance,
+                                    })}'
+                              : '';
+                          return '${shop.name}$route$owes';
+                        }(),
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (shop) => setState(() {
+                _selectedShop = shop;
+                _returnQuantities.clear();
+              }),
+            ),
           ],
           const SizedBox(height: 16),
           Text(
@@ -1542,7 +1653,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
               final imageUrl = allocation.productImageUrl ?? product?.imageUrl;
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
+                padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
@@ -1575,35 +1686,47 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                         ],
                       ),
                     ),
-                    IconButton(
-                      onPressed: qty > 0
-                          ? () => setState(
-                                () =>
-                                    _quantities[allocation.productId] = qty - 1,
-                              )
-                          : null,
-                      icon: const Icon(Icons.remove),
-                    ),
-                    Text(
-                      '$qty',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: qty < allocation.remaining
-                          ? () => setState(
-                                () =>
-                                    _quantities[allocation.productId] = qty + 1,
-                              )
-                          : null,
-                      icon: const Icon(Icons.add),
+                    QtyStepper(
+                      value: qty,
+                      max: allocation.remaining,
+                      onExceedMax: () {
+                        showAppToast(
+                          context,
+                          t(
+                            'delivery.qtyExceedsStock',
+                            {'count': allocation.remaining},
+                          ),
+                        );
+                      },
+                      onChanged: (value) {
+                        setState(() {
+                          _quantities[allocation.productId] = value;
+                        });
+                      },
                     ),
                   ],
                 ),
               );
             }),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _openReturnItems,
+            icon: Icon(
+              _returnLineCount > 0
+                  ? Icons.visibility_outlined
+                  : Icons.undo_rounded,
+            ),
+            label: Text(
+              _returnLineCount > 0
+                  ? t('delivery.viewReturnItems', {'count': _returnLineCount})
+                  : t('delivery.addReturnItems'),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFB91C1C),
+              side: const BorderSide(color: Color(0xFFFECACA)),
+              minimumSize: const Size.fromHeight(48),
+            ),
+          ),
           const SizedBox(height: 16),
           TextField(
             controller: _notesController,
@@ -1644,7 +1767,9 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
               deliveryName: widget.user.name,
               saleDate: DateTime.now(),
               items: _previewItems,
+              returns: _previewReturns,
               totalAmount: _previewTotal,
+              returnsAmount: _previewReturnsTotal,
               previousBalance: _selectedShop?.outstandingAsDouble ?? 0,
               paidAmount: 0,
               shopOwner: _selectedShop?.ownerName,
