@@ -23,6 +23,7 @@ import '../widgets/chat_screen.dart';
 import '../widgets/chat_unread_listener.dart';
 import '../widgets/call_options_sheet.dart';
 import 'account_settings_screen.dart';
+import 'admin_expenses_page.dart';
 
 class AdminShell extends StatefulWidget {
   const AdminShell({
@@ -54,6 +55,7 @@ class _AdminShellState extends State<AdminShell> {
     _AdminSection(0, 'nav.dashboard', Icons.dashboard_outlined),
     _AdminSection(1, 'nav.products', Icons.inventory_2_outlined),
     _AdminSection(2, 'nav.sales', Icons.payments_outlined),
+    _AdminSection(11, 'nav.expenses', Icons.receipt_long_outlined),
     _AdminSection(3, 'nav.partners', Icons.local_shipping_outlined),
     _AdminSection(
       4,
@@ -142,6 +144,8 @@ class _AdminShellState extends State<AdminShell> {
           apiService: widget.apiService,
           businessSettings: _businessSettings,
         );
+      case 11:
+        return AdminExpensesPage(apiService: widget.apiService);
       case 3:
         return _AdminPartnersPage(apiService: widget.apiService);
       case 4:
@@ -939,6 +943,19 @@ class _AdminSalesPageState extends State<_AdminSalesPage> {
                   '${group.deliveryGuyName} · ${group.itemsLabel}',
                   style: const TextStyle(fontSize: 13),
                 ),
+                if (group.returns.isNotEmpty)
+                  Text(
+                    '${t('delivery.returnedQty', {
+                          'count': group.returns.fold<int>(
+                            0,
+                            (sum, item) => sum + item.quantity,
+                          ),
+                        })} · ${group.returnsLabel}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFFB91C1C),
+                    ),
+                  ),
                 Text(
                   formatCurrencyFromString(group.totalAmount),
                   style: const TextStyle(fontWeight: FontWeight.bold),
@@ -957,7 +974,11 @@ class _AdminSalesPageState extends State<_AdminSalesPage> {
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(sale.saleDate.toLocal().toString()),
-                        subtitle: Text(sale.itemsLabel),
+                        subtitle: Text(
+                          sale.returns.isEmpty
+                              ? sale.itemsLabel
+                              : '${sale.itemsLabel}\n${sale.returnsLabel}',
+                        ),
                         trailing: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -1089,6 +1110,7 @@ class _AdminSalesPageState extends State<_AdminSalesPage> {
                               group.deliveryGuyName,
                               group.dropDate,
                               group.itemsLabel,
+                              if (group.returns.isNotEmpty) group.returnsLabel,
                               t('admin.saleCount', {'count': group.saleCount}),
                             ].join(' • '),
                           ),
@@ -1236,6 +1258,7 @@ class _PartnerAssignmentGroup {
     required this.items,
     required this.totalAllocated,
     required this.totalSold,
+    required this.totalReturned,
     required this.totalRemaining,
   });
 
@@ -1244,6 +1267,7 @@ class _PartnerAssignmentGroup {
   final List<AllocationSummary> items;
   int totalAllocated;
   int totalSold;
+  int totalReturned;
   int totalRemaining;
 }
 
@@ -1272,6 +1296,7 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
         existing.items.add(row);
         existing.totalAllocated += row.allocated;
         existing.totalSold += row.sold;
+        existing.totalReturned += row.returned;
         existing.totalRemaining += row.remaining;
         continue;
       }
@@ -1281,6 +1306,7 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
         items: [row],
         totalAllocated: row.allocated,
         totalSold: row.sold,
+        totalReturned: row.returned,
         totalRemaining: row.remaining,
       );
     }
@@ -1343,6 +1369,12 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: _assignmentStatChip(
+                        t('admin.returned', {'count': group.totalReturned}),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _assignmentStatChip(
                         t('admin.left', {'count': group.totalRemaining}),
                       ),
                     ),
@@ -1369,6 +1401,7 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
                       final item = group.items[index];
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
+                        isThreeLine: item.returnShops.isNotEmpty,
                         title: Text(
                           item.productName,
                           style: const TextStyle(fontWeight: FontWeight.w600),
@@ -1376,7 +1409,14 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
                         subtitle: Text(
                           '${t('admin.given', {'count': item.allocated})}  ·  '
                           '${t('admin.sold', {'count': item.sold})}  ·  '
-                          '${t('admin.left', {'count': item.remaining})}',
+                          '${t('admin.returned', {'count': item.returned})}  ·  '
+                          '${t('admin.left', {'count': item.remaining})}'
+                          '${item.returnShops.isEmpty ? '' : '\n${t('delivery.returnsFrom', {
+                                'shops': item.returnShops
+                                    .map((shop) =>
+                                        '${shop.shopName} × ${shop.quantity}')
+                                    .join(', '),
+                              })}'}',
                         ),
                       );
                     },
@@ -1717,6 +1757,9 @@ class _AdminAssignmentsPageState extends State<_AdminAssignmentsPage> {
                                     })}  ·  '
                                 '${t('admin.sold', {
                                       'count': group.totalSold,
+                                    })}  ·  '
+                                '${t('admin.returned', {
+                                      'count': group.totalReturned,
                                     })}  ·  '
                                 '${t('admin.left', {
                                       'count': group.totalRemaining,
@@ -2435,7 +2478,11 @@ class _AdminCalendarPageState extends State<_AdminCalendarPage> {
                                           title: Text(
                                             sale.saleDate.toLocal().toString(),
                                           ),
-                                          subtitle: Text(sale.itemsLabel),
+                                          subtitle: Text(
+                                            sale.returns.isEmpty
+                                                ? sale.itemsLabel
+                                                : '${sale.itemsLabel}\n${sale.returnsLabel}',
+                                          ),
                                           trailing: Text(
                                             formatCurrencyFromString(
                                               sale.totalAmount,

@@ -1,3 +1,23 @@
+class ReturnShopLine {
+  final int shopId;
+  final String shopName;
+  final int quantity;
+
+  const ReturnShopLine({
+    required this.shopId,
+    required this.shopName,
+    required this.quantity,
+  });
+
+  factory ReturnShopLine.fromJson(Map<String, dynamic> json) {
+    return ReturnShopLine(
+      shopId: json['shopId'] as int,
+      shopName: json['shopName'] as String,
+      quantity: json['quantity'] as int,
+    );
+  }
+}
+
 class AllocationSummary {
   final int deliveryGuyId;
   final String deliveryGuyName;
@@ -10,6 +30,8 @@ class AllocationSummary {
   final int allocated;
   final int sold;
   final int remaining;
+  final int returned;
+  final List<ReturnShopLine> returnShops;
 
   const AllocationSummary({
     required this.deliveryGuyId,
@@ -23,6 +45,8 @@ class AllocationSummary {
     required this.allocated,
     required this.sold,
     required this.remaining,
+    this.returned = 0,
+    this.returnShops = const [],
   });
 
   factory AllocationSummary.fromJson(Map<String, dynamic> json) {
@@ -38,6 +62,12 @@ class AllocationSummary {
       allocated: json['allocated'] as int,
       sold: json['sold'] as int,
       remaining: json['remaining'] as int,
+      returned: json['returned'] as int? ?? 0,
+      returnShops: ((json['returnShops'] as List?) ?? [])
+          .map(
+            (item) => ReturnShopLine.fromJson(item as Map<String, dynamic>),
+          )
+          .toList(),
     );
   }
 }

@@ -29,6 +29,7 @@ import '../widgets/chat_screen.dart';
 import '../widgets/chat_unread_listener.dart';
 import 'account_settings_screen.dart';
 import 'add_shop_screen.dart';
+import 'driver_expenses_screen.dart';
 import 'return_items_screen.dart';
 
 class DeliveryHomeScreen extends StatefulWidget {
@@ -76,6 +77,7 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
     _DeliveryNavItem(2, 'delivery.saleHistory', Icons.history_outlined),
     _DeliveryNavItem(3, 'nav.notifications', Icons.notifications_outlined),
     _DeliveryNavItem(4, 'nav.conversations', Icons.chat_bubble_outline),
+    _DeliveryNavItem(5, 'nav.expenses', Icons.receipt_long_outlined),
   ];
 
   List<_DeliveryNavItem> get _navItems {
@@ -271,6 +273,8 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
   int get _totalAssigned =>
       _allocations.fold(0, (sum, item) => sum + item.allocated);
   int get _totalSold => _allocations.fold(0, (sum, item) => sum + item.sold);
+  int get _totalReturned =>
+      _allocations.fold(0, (sum, item) => sum + item.returned);
   int get _totalLeft =>
       _allocations.fold(0, (sum, item) => sum + item.remaining);
 
@@ -436,6 +440,35 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
               ),
             ],
           ),
+          if (item.returned > 0) ...[
+            const SizedBox(height: 10),
+            Text(
+              t('delivery.soldAndReturned', {
+                'sold': item.sold,
+                'returned': item.returned,
+              }),
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFB91C1C),
+              ),
+            ),
+            if (item.returnShops.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  t('delivery.returnsFrom', {
+                    'shops': item.returnShops
+                        .map((shop) => '${shop.shopName} × ${shop.quantity}')
+                        .join(', '),
+                  }),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF78716C),
+                    height: 1.35,
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -565,6 +598,28 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                   ),
                 ),
               ],
+              if (sale.returns.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ...sale.returns.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      t('delivery.productSoldAndReturned', {
+                        'name': item.productName,
+                        'sold': sale.items
+                            .where((row) => row.productId == item.productId)
+                            .fold<int>(0, (sum, row) => sum + row.quantity),
+                        'returned': item.quantity,
+                      }),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFB91C1C),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               Text(
                 t('delivery.viewBill'),
@@ -643,6 +698,22 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
               style: const TextStyle(
                 fontSize: 13,
                 color: Color(0xFF57534E),
+                height: 1.35,
+              ),
+            ),
+          ],
+          if (drop.returns.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${t('delivery.returnedQty', {
+                    'count': drop.returns.fold<int>(
+                      0,
+                      (sum, item) => sum + item.quantity,
+                    ),
+                  })} · ${drop.returnsLabel}',
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFFB91C1C),
                 height: 1.35,
               ),
             ),
@@ -758,6 +829,19 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
                     ),
                   ],
                 ),
+                if (_totalReturned > 0) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    t('delivery.soldAndReturned', {
+                      'sold': _totalSold,
+                      'returned': _totalReturned,
+                    }),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFB91C1C),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1030,24 +1114,28 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
           ],
         ),
       ),
-      floatingActionButton: Padding(
-        padding: EdgeInsets.only(bottom: systemBottomInset(context)),
-        child: FloatingActionButton.extended(
-          onPressed: _openingCreate ? null : _openCreateDelivery,
-          backgroundColor: const Color(0xFFB45309),
-          foregroundColor: Colors.white,
-          label: Text(
-            _openingCreate ? t('common.loading') : t('delivery.titleNew'),
-          ),
-          icon: _openingCreate
-              ? const BakeryLoadingSpinner(
-                  size: BakerySpinnerSize.sm,
-                  color: Colors.white,
-                  trackColor: Color(0x33FFFFFF),
-                )
-              : const Icon(Icons.add),
-        ),
-      ),
+      floatingActionButton: _section >= 3
+          ? null
+          : Padding(
+              padding: EdgeInsets.only(bottom: systemBottomInset(context)),
+              child: FloatingActionButton.extended(
+                onPressed: _openingCreate ? null : _openCreateDelivery,
+                backgroundColor: const Color(0xFFB45309),
+                foregroundColor: Colors.white,
+                label: Text(
+                  _openingCreate
+                      ? t('common.loading')
+                      : t('delivery.titleNew'),
+                ),
+                icon: _openingCreate
+                    ? const BakeryLoadingSpinner(
+                        size: BakerySpinnerSize.sm,
+                        color: Colors.white,
+                        trackColor: Color(0x33FFFFFF),
+                      )
+                    : const Icon(Icons.add),
+              ),
+            ),
       body: Column(
         children: [
           if (widget.apiService.features.messages)
@@ -1092,30 +1180,32 @@ class _DeliveryHomeScreenState extends State<DeliveryHomeScreen> {
               child: Text(_error!, style: const TextStyle(color: Colors.red)),
             ),
           Expanded(
-            child: _loading
-                ? const BakeryLoadingCenter()
-                : RefreshIndicator(
-                    onRefresh: _load,
-                    child: _section == 0
-                        ? _assignmentsTab(t)
-                        : _section == 1
-                            ? _mySalesTab(t)
-                            : _section == 2
-                                ? _historyTab(t)
-                                : _section == 3
-                                    ? NotificationsScreen(
-                                        apiService: widget.apiService,
-                                        showAppBar: false,
-                                        deliveryMode: true,
-                                      )
-                                    : widget.apiService.features.messages
-                                        ? ConversationsScreen(
+            child: _section == 5
+                ? DriverExpensesScreen(apiService: widget.apiService)
+                : _loading
+                    ? const BakeryLoadingCenter()
+                    : RefreshIndicator(
+                        onRefresh: _load,
+                        child: _section == 0
+                            ? _assignmentsTab(t)
+                            : _section == 1
+                                ? _mySalesTab(t)
+                                : _section == 2
+                                    ? _historyTab(t)
+                                    : _section == 3
+                                        ? NotificationsScreen(
                                             apiService: widget.apiService,
-                                            isDelivery: true,
-                                            myUserId: widget.user.id,
+                                            showAppBar: false,
+                                            deliveryMode: true,
                                           )
-                                        : const SizedBox.shrink(),
-                  ),
+                                        : widget.apiService.features.messages
+                                            ? ConversationsScreen(
+                                                apiService: widget.apiService,
+                                                isDelivery: true,
+                                                myUserId: widget.user.id,
+                                              )
+                                            : const SizedBox.shrink(),
+                      ),
           ),
         ],
       ),

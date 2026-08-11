@@ -14,6 +14,7 @@ import '../models/sale.dart';
 import '../models/shop.dart';
 import '../models/shop_drop.dart';
 import '../models/user.dart';
+import '../models/expense.dart';
 import '../models/notification.dart';
 import '../utils/dates.dart';
 
@@ -664,5 +665,98 @@ class ApiService {
       return Map<String, dynamic>.from(message);
     }
     return null;
+  }
+
+  Future<List<DriverExpense>> fetchExpenses({
+    String? dateFrom,
+    String? dateTo,
+    int? deliveryGuyId,
+    bool today = false,
+  }) async {
+    final params = <String, String>{};
+    if (dateFrom != null && dateFrom.isNotEmpty) params['dateFrom'] = dateFrom;
+    if (dateTo != null && dateTo.isNotEmpty) params['dateTo'] = dateTo;
+    if (deliveryGuyId != null) {
+      params['deliveryGuyId'] = deliveryGuyId.toString();
+    }
+    if (today) params['today'] = 'true';
+    final uri = Uri.parse('$_baseUrl/api/expenses').replace(
+      queryParameters: params.isEmpty ? null : params,
+    );
+    final response = await _client.get(uri, headers: _headers());
+    final data = await _decode(response);
+    return ((data['expenses'] as List?) ?? [])
+        .map((item) => DriverExpense.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<DriverExpense> createExpense({
+    required String reason,
+    required String amount,
+    required String expenseDate,
+    String? attachmentUrl,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$_baseUrl/api/expenses'),
+      headers: _headers(),
+      body: jsonEncode({
+        'reason': reason,
+        'amount': amount,
+        'expenseDate': expenseDate,
+        if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
+      }),
+    );
+    final data = await _decode(response);
+    return DriverExpense.fromJson(data['expense'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteExpense(int id) async {
+    final response = await _client.delete(
+      Uri.parse('$_baseUrl/api/expenses/$id'),
+      headers: _headers(),
+    );
+    await _decode(response);
+  }
+
+  Future<List<SalaryPayment>> fetchSalaryPayments({
+    String? dateFrom,
+    String? dateTo,
+    int? deliveryGuyId,
+  }) async {
+    final params = <String, String>{};
+    if (dateFrom != null && dateFrom.isNotEmpty) params['dateFrom'] = dateFrom;
+    if (dateTo != null && dateTo.isNotEmpty) params['dateTo'] = dateTo;
+    if (deliveryGuyId != null) {
+      params['deliveryGuyId'] = deliveryGuyId.toString();
+    }
+    final uri = Uri.parse('$_baseUrl/api/salary-payments').replace(
+      queryParameters: params.isEmpty ? null : params,
+    );
+    final response = await _client.get(uri, headers: _headers());
+    final data = await _decode(response);
+    return ((data['payments'] as List?) ?? [])
+        .map((item) => SalaryPayment.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> createSalaryPayment({
+    required int deliveryGuyId,
+    required String paymentDate,
+    required String salaryAmount,
+    required List<int> expenseIds,
+    String? notes,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$_baseUrl/api/salary-payments'),
+      headers: _headers(),
+      body: jsonEncode({
+        'deliveryGuyId': deliveryGuyId,
+        'paymentDate': paymentDate,
+        'salaryAmount': salaryAmount,
+        'expenseIds': expenseIds,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      }),
+    );
+    await _decode(response);
   }
 }

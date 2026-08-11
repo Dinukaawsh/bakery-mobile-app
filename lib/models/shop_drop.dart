@@ -27,6 +27,7 @@ class ShopDropSale {
   final String totalAmount;
   final bool billPrinted;
   final List<ShopDropItem> items;
+  final List<ShopDropItem> returns;
 
   const ShopDropSale({
     required this.id,
@@ -34,6 +35,7 @@ class ShopDropSale {
     required this.totalAmount,
     required this.billPrinted,
     required this.items,
+    this.returns = const [],
   });
 
   factory ShopDropSale.fromJson(Map<String, dynamic> json) {
@@ -45,11 +47,20 @@ class ShopDropSale {
       items: ((json['items'] as List?) ?? [])
           .map((item) => ShopDropItem.fromJson(item as Map<String, dynamic>))
           .toList(),
+      returns: ((json['returns'] as List?) ?? [])
+          .map((item) => ShopDropItem.fromJson(item as Map<String, dynamic>))
+          .toList(),
     );
   }
 
   String get itemsLabel {
     return items
+        .map((item) => '${item.productName} × ${item.quantity}')
+        .join(', ');
+  }
+
+  String get returnsLabel {
+    return returns
         .map((item) => '${item.productName} × ${item.quantity}')
         .join(', ');
   }
@@ -67,6 +78,7 @@ class ShopDropSummary {
   final String totalAmount;
   final int saleCount;
   final List<ShopDropItem> items;
+  final List<ShopDropItem> returns;
   final List<ShopDropSale> sales;
 
   const ShopDropSummary({
@@ -81,6 +93,7 @@ class ShopDropSummary {
     required this.totalAmount,
     required this.saleCount,
     required this.items,
+    this.returns = const [],
     required this.sales,
   });
 
@@ -100,6 +113,9 @@ class ShopDropSummary {
       items: (json['items'] as List)
           .map((item) => ShopDropItem.fromJson(item as Map<String, dynamic>))
           .toList(),
+      returns: ((json['returns'] as List?) ?? [])
+          .map((item) => ShopDropItem.fromJson(item as Map<String, dynamic>))
+          .toList(),
       sales: salesJson
           .map((item) => ShopDropSale.fromJson(item as Map<String, dynamic>))
           .toList(),
@@ -108,6 +124,12 @@ class ShopDropSummary {
 
   String get itemsLabel {
     return items
+        .map((item) => '${item.productName} × ${item.quantity}')
+        .join(', ');
+  }
+
+  String get returnsLabel {
+    return returns
         .map((item) => '${item.productName} × ${item.quantity}')
         .join(', ');
   }
