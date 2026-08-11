@@ -400,4 +400,7 @@ const Map<String, String> stringsEn = {
   'expenses.paymentsTitle': 'Salary payments',
   'expenses.salary': 'Salary',
   'expenses.colExpenses': 'Expenses',
+  'expenses.monthlyTitle': 'Monthly expenses by partner',
+  'expenses.colMonth': 'Month',
+  'expenses.colCount': '{count} items',
 };

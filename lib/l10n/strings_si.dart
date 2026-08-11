@@ -403,4 +403,7 @@ const Map<String, String> stringsSi = {
   'expenses.paymentsTitle': 'වැටුප් ගෙවීම්',
   'expenses.salary': 'වැටුප',
   'expenses.colExpenses': 'වියදම්',
+  'expenses.monthlyTitle': 'හවුල්කරු අනුව මාසික වියදම්',
+  'expenses.colMonth': 'මාසය',
+  'expenses.colCount': 'අයිතම {count}',
 };

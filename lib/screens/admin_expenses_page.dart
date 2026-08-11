@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/locale_scope.dart';
@@ -86,6 +87,51 @@ class _AdminExpensesPageState extends State<AdminExpensesPage> {
     final id = int.tryParse(_payPartnerId ?? '');
     if (id == null) return const [];
     return _expenses.where((row) => row.deliveryGuyId == id && !row.paid).toList();
+  }
+
+  List<_MonthlyExpense> get _monthly {
+    final map = <String, _MonthlyExpense>{};
+    for (final row in _expenses) {
+      final month = row.expenseDate.length >= 7
+          ? row.expenseDate.substring(0, 7)
+          : row.expenseDate;
+      final key = '${row.deliveryGuyId}-$month';
+      final amount = double.tryParse(row.amount) ?? 0;
+      final existing = map[key];
+      if (existing != null) {
+        existing.total += amount;
+        existing.count += 1;
+        if (row.paid) {
+          existing.paid += amount;
+        } else {
+          existing.unpaid += amount;
+        }
+        continue;
+      }
+      map[key] = _MonthlyExpense(
+        deliveryGuyName: row.deliveryGuyName,
+        monthKey: month,
+        total: amount,
+        unpaid: row.paid ? 0 : amount,
+        paid: row.paid ? amount : 0,
+        count: 1,
+      );
+    }
+    final rows = map.values.toList()
+      ..sort((a, b) {
+        final monthCmp = b.monthKey.compareTo(a.monthKey);
+        if (monthCmp != 0) return monthCmp;
+        return a.deliveryGuyName.compareTo(b.deliveryGuyName);
+      });
+    return rows;
+  }
+
+  String _monthLabel(String monthKey) {
+    final parts = monthKey.split('-');
+    if (parts.length < 2) return monthKey;
+    final year = int.tryParse(parts[0]) ?? 0;
+    final month = int.tryParse(parts[1]) ?? 1;
+    return DateFormat.yMMMM().format(DateTime(year, month));
   }
 
   double get _salaryTotal {
@@ -248,6 +294,50 @@ class _AdminExpensesPageState extends State<AdminExpensesPage> {
                 child: ListView(
                   padding: const EdgeInsets.only(bottom: 88),
                   children: [
+                    if (_monthly.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                        child: Text(
+                          t('expenses.monthlyTitle'),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      ..._monthly.map(
+                        (row) => Card(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 6,
+                          ),
+                          color: const Color(0xFFFFF7ED),
+                          child: ListTile(
+                            title: Text(
+                              row.deliveryGuyName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${_monthLabel(row.monthKey)}\n'
+                              '${t('expenses.unpaid')}: ${formatCurrency(row.unpaid)}'
+                              '  ·  ${t('expenses.paidInSalary')}: ${formatCurrency(row.paid)}\n'
+                              '${t('expenses.colCount', {'count': row.count})}',
+                            ),
+                            isThreeLine: true,
+                            trailing: Text(
+                              formatCurrency(row.total),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     if (_expenses.isEmpty)
                       Padding(
                         padding: const EdgeInsets.all(24),
@@ -515,4 +605,22 @@ class _AdminExpensesPageState extends State<AdminExpensesPage> {
       ],
     );
   }
+}
+
+class _MonthlyExpense {
+  _MonthlyExpense({
+    required this.deliveryGuyName,
+    required this.monthKey,
+    required this.total,
+    required this.unpaid,
+    required this.paid,
+    required this.count,
+  });
+
+  final String deliveryGuyName;
+  final String monthKey;
+  double total;
+  double unpaid;
+  double paid;
+  int count;
 }
