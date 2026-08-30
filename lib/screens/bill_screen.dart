@@ -4,12 +4,14 @@ import '../l10n/locale_scope.dart';
 import '../models/business_settings.dart';
 import '../models/sale.dart';
 import '../services/api_service.dart';
+import '../services/thermal_printer_service.dart';
 import '../utils/bill_print.dart';
 import '../utils/currency.dart';
 import '../utils/safe_insets.dart';
 import '../widgets/bakery_app_bar.dart';
 import '../widgets/bakery_loading_spinner.dart';
 import '../widgets/bill_receipt_card.dart';
+import '../widgets/printer_setup_sheet.dart';
 import '../widgets/sale_comments_section.dart';
 
 class BillScreen extends StatefulWidget {
@@ -36,6 +38,8 @@ class _BillScreenState extends State<BillScreen> {
   bool _loading = true;
   bool _printing = false;
   bool _savingPayment = false;
+  bool _showMorePrintOptions = false;
+  SavedPrinter? _savedPrinter;
   final _paidController = TextEditingController();
   final _paidFocus = FocusNode();
 
@@ -43,6 +47,7 @@ class _BillScreenState extends State<BillScreen> {
   void initState() {
     super.initState();
     _load();
+    _loadPrinter();
   }
 
   @override
@@ -50,6 +55,13 @@ class _BillScreenState extends State<BillScreen> {
     _paidFocus.dispose();
     _paidController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadPrinter() async {
+    if (!ThermalPrinterService.isSupported) return;
+    final printer = await ThermalPrinterService.instance.getSavedPrinter();
+    if (!mounted) return;
+    setState(() => _savedPrinter = printer);
   }
 
   String _displayPaidAmount(String amount) {
@@ -162,51 +174,102 @@ class _BillScreenState extends State<BillScreen> {
     }
   }
 
-  Future<void> _printBill() async {
+  Future<Sale> _prepareSaleForPrint() async {
     final sale = _sale;
-    if (sale == null || _printing) return;
-    final localeController = LocaleScope.of(context);
-    final t = localeController.t;
+    if (sale == null) {
+      throw StateError('Sale not loaded');
+    }
+
+    var current = sale;
+    final paid = _paidPreview;
+    if ((double.tryParse(sale.paidAmount) ?? 0) != paid) {
+      current = await widget.apiService.settleSalePayment(sale.id, paid);
+    }
+    return current;
+  }
+
+  void _applyPrintedSale(Sale current) {
+    setState(() {
+      _sale = current;
+      _paidController.text = _displayPaidAmount(current.paidAmount);
+    });
+  }
+
+  Future<void> _printBill() async {
+    if (_sale == null || _printing) return;
+    final t = LocaleScope.of(context).t;
 
     setState(() => _printing = true);
     try {
-      var current = sale;
-      final paid = _paidPreview;
-      if ((double.tryParse(sale.paidAmount) ?? 0) != paid) {
-        current = await widget.apiService.settleSalePayment(sale.id, paid);
-      }
+      var current = await _prepareSaleForPrint();
 
-      await printBillReceipt(
-        settings: widget.businessSettings,
-        billNumberLabel: t('bill.billNumber', {'id': current.id}),
-        shopName: current.shopName,
-        deliveryName: current.deliveryGuyName,
-        saleDate: current.saleDate,
-        items: _lineItems(current),
-        returns: _returnItems(current),
-        totalAmount: _todayTotal(current),
-        returnsAmount: _returnsAmount(current),
-        t: t,
-        previousBalance: _previous(current),
-        paidAmount: double.tryParse(current.paidAmount) ?? paid,
-        remainingAfter: double.tryParse(current.remainingAfter),
-        shopOwner: current.shopOwner,
-        shopAddress: current.shopAddress,
-        shopPhone: current.shopPhone,
-        notes: current.notes,
-      );
+      if (ThermalPrinterService.isSupported) {
+        var printer = _savedPrinter ??
+            await ThermalPrinterService.instance.getSavedPrinter();
+        if (printer == null) {
+          if (!mounted) return;
+          printer = await showPrinterSetupSheet(context);
+        }
+        if (printer == null) return;
+
+        await printBillReceiptThermal(
+          mac: printer.mac,
+          settings: widget.businessSettings,
+          billNumberLabel: t('bill.billNumber', {'id': current.id}),
+          shopName: current.shopName,
+          deliveryName: current.deliveryGuyName,
+          saleDate: current.saleDate,
+          items: _lineItems(current),
+          returns: _returnItems(current),
+          totalAmount: _todayTotal(current),
+          returnsAmount: _returnsAmount(current),
+          t: t,
+          previousBalance: _previous(current),
+          paidAmount: double.tryParse(current.paidAmount) ?? _paidPreview,
+          remainingAfter: double.tryParse(current.remainingAfter),
+          shopOwner: current.shopOwner,
+          shopAddress: current.shopAddress,
+          shopPhone: current.shopPhone,
+          notes: current.notes,
+        );
+
+        setState(() => _savedPrinter = printer);
+      } else {
+        await shareBillReceipt(
+          saleId: current.id,
+          settings: widget.businessSettings,
+          billNumberLabel: t('bill.billNumber', {'id': current.id}),
+          shopName: current.shopName,
+          deliveryName: current.deliveryGuyName,
+          saleDate: current.saleDate,
+          items: _lineItems(current),
+          returns: _returnItems(current),
+          totalAmount: _todayTotal(current),
+          returnsAmount: _returnsAmount(current),
+          t: t,
+          previousBalance: _previous(current),
+          paidAmount: double.tryParse(current.paidAmount) ?? _paidPreview,
+          remainingAfter: double.tryParse(current.remainingAfter),
+          shopOwner: current.shopOwner,
+          shopAddress: current.shopAddress,
+          shopPhone: current.shopPhone,
+          notes: current.notes,
+        );
+      }
 
       if (!current.billPrinted) {
         current = await widget.apiService.markBillPrinted(current.id);
       }
 
       if (!mounted) return;
-      setState(() {
-        _sale = current;
-        _paidController.text = _displayPaidAmount(current.paidAmount);
-      });
+      _applyPrintedSale(current);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(t('bill.sentToPrinter'))),
+      );
+    } on ThermalPrinterException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t(error.code))),
       );
     } catch (error) {
       if (!mounted) return;
@@ -227,10 +290,122 @@ class _BillScreenState extends State<BillScreen> {
     }
   }
 
+  Future<void> _shareBillPdf() async {
+    if (_sale == null || _printing) return;
+    final t = LocaleScope.of(context).t;
+
+    setState(() => _printing = true);
+    try {
+      var current = await _prepareSaleForPrint();
+      await shareBillReceipt(
+        saleId: current.id,
+        settings: widget.businessSettings,
+        billNumberLabel: t('bill.billNumber', {'id': current.id}),
+        shopName: current.shopName,
+        deliveryName: current.deliveryGuyName,
+        saleDate: current.saleDate,
+        items: _lineItems(current),
+        returns: _returnItems(current),
+        totalAmount: _todayTotal(current),
+        returnsAmount: _returnsAmount(current),
+        t: t,
+        previousBalance: _previous(current),
+        paidAmount: double.tryParse(current.paidAmount) ?? _paidPreview,
+        remainingAfter: double.tryParse(current.remainingAfter),
+        shopOwner: current.shopOwner,
+        shopAddress: current.shopAddress,
+        shopPhone: current.shopPhone,
+        notes: current.notes,
+      );
+
+      if (!current.billPrinted) {
+        current = await widget.apiService.markBillPrinted(current.id);
+      }
+
+      if (!mounted) return;
+      _applyPrintedSale(current);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            t(
+              'bill.printFailed',
+              {
+                'error': error.toString().replaceFirst('Exception: ', ''),
+              },
+            ),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  Future<void> _systemPrintBill() async {
+    if (_sale == null || _printing) return;
+    final t = LocaleScope.of(context).t;
+
+    setState(() => _printing = true);
+    try {
+      var current = await _prepareSaleForPrint();
+      await printBillReceipt(
+        settings: widget.businessSettings,
+        billNumberLabel: t('bill.billNumber', {'id': current.id}),
+        shopName: current.shopName,
+        deliveryName: current.deliveryGuyName,
+        saleDate: current.saleDate,
+        items: _lineItems(current),
+        returns: _returnItems(current),
+        totalAmount: _todayTotal(current),
+        returnsAmount: _returnsAmount(current),
+        t: t,
+        previousBalance: _previous(current),
+        paidAmount: double.tryParse(current.paidAmount) ?? _paidPreview,
+        remainingAfter: double.tryParse(current.remainingAfter),
+        shopOwner: current.shopOwner,
+        shopAddress: current.shopAddress,
+        shopPhone: current.shopPhone,
+        notes: current.notes,
+      );
+
+      if (!current.billPrinted) {
+        current = await widget.apiService.markBillPrinted(current.id);
+      }
+
+      if (!mounted) return;
+      _applyPrintedSale(current);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            t(
+              'bill.printFailed',
+              {
+                'error': error.toString().replaceFirst('Exception: ', ''),
+              },
+            ),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
+  Future<void> _changePrinter() async {
+    final printer = await showPrinterSetupSheet(context);
+    if (printer == null || !mounted) return;
+    setState(() => _savedPrinter = printer);
+  }
+
   @override
   Widget build(BuildContext context) {
     final sale = _sale;
     final t = LocaleScope.of(context).t;
+    final thermalSupported = ThermalPrinterService.isSupported;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFFBEB),
@@ -331,6 +506,47 @@ class _BillScreenState extends State<BillScreen> {
                             : t('bill.savePayment'),
                       ),
                     ),
+                    if (thermalSupported) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              t('printer.title'),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _savedPrinter == null
+                                  ? t('printer.noneSaved')
+                                  : t(
+                                      'printer.current',
+                                      {'name': _savedPrinter!.name},
+                                    ),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF78716C),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: _printing ? null : _changePrinter,
+                              child: Text(t('printer.change')),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 10),
                     FilledButton.icon(
                       onPressed: _printing ? null : _printBill,
@@ -353,6 +569,55 @@ class _BillScreenState extends State<BillScreen> {
                         minimumSize: const Size.fromHeight(52),
                       ),
                     ),
+                    if (thermalSupported) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        t('bill.shareHint'),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF78716C),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        onPressed: _printing
+                            ? null
+                            : () => setState(
+                                  () => _showMorePrintOptions =
+                                      !_showMorePrintOptions,
+                                ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(44),
+                          foregroundColor: const Color(0xFFB45309),
+                          side: const BorderSide(color: Color(0xFFFDE68A)),
+                        ),
+                        child: Text(t('bill.morePrintOptions')),
+                      ),
+                      if (_showMorePrintOptions) ...[
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: _printing ? null : _shareBillPdf,
+                          icon: const Icon(Icons.share_rounded),
+                          label: Text(t('bill.sharePdf')),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(44),
+                            foregroundColor: const Color(0xFFB45309),
+                            side: const BorderSide(color: Color(0xFFFDE68A)),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: _printing ? null : _systemPrintBill,
+                          icon: const Icon(Icons.print_outlined),
+                          label: Text(t('bill.systemPrint')),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(44),
+                            foregroundColor: const Color(0xFFB45309),
+                            side: const BorderSide(color: Color(0xFFFDE68A)),
+                          ),
+                        ),
+                      ],
+                    ],
                     const SizedBox(height: 10),
                     OutlinedButton(
                       onPressed: () => Navigator.of(context).pop(true),

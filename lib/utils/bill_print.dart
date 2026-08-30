@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import '../models/business_settings.dart';
+import '../services/thermal_printer_service.dart';
 import '../utils/currency.dart';
 import '../widgets/bill_receipt_card.dart';
 
@@ -143,7 +144,7 @@ class _BillTextFactory {
   }
 }
 
-Future<void> printBillReceipt({
+Future<Uint8List> buildBillReceiptPdf({
   required BusinessSettings settings,
   required String billNumberLabel,
   required String shopName,
@@ -431,7 +432,149 @@ Future<void> printBillReceipt({
     ),
   );
 
-  await Printing.layoutPdf(onLayout: (format) async => doc.save());
+  return doc.save();
+}
+
+String billPdfFilename(int saleId) => 'bill-$saleId.pdf';
+
+/// Opens the Android/iOS share sheet so the driver can pick a Bluetooth
+/// printer app (XPrinter, Sunmi, etc.). Most BT thermal printers are not
+/// visible in the system print dialog.
+Future<void> shareBillReceipt({
+  required int saleId,
+  required BusinessSettings settings,
+  required String billNumberLabel,
+  required String shopName,
+  required String deliveryName,
+  required DateTime saleDate,
+  required List<BillLineItem> items,
+  required double totalAmount,
+  required BillTranslate t,
+  List<BillLineItem> returns = const [],
+  double returnsAmount = 0,
+  double previousBalance = 0,
+  double paidAmount = 0,
+  double? remainingAfter,
+  String? shopOwner,
+  String? shopAddress,
+  String? shopPhone,
+  String? notes,
+}) async {
+  final bytes = await buildBillReceiptPdf(
+    settings: settings,
+    billNumberLabel: billNumberLabel,
+    shopName: shopName,
+    deliveryName: deliveryName,
+    saleDate: saleDate,
+    items: items,
+    totalAmount: totalAmount,
+    t: t,
+    returns: returns,
+    returnsAmount: returnsAmount,
+    previousBalance: previousBalance,
+    paidAmount: paidAmount,
+    remainingAfter: remainingAfter,
+    shopOwner: shopOwner,
+    shopAddress: shopAddress,
+    shopPhone: shopPhone,
+    notes: notes,
+  );
+
+  await Printing.sharePdf(
+    bytes: bytes,
+    filename: billPdfFilename(saleId),
+  );
+}
+
+/// Standard system print dialog. Wi‑Fi/office printers only; most Bluetooth
+/// thermal printers will not appear here.
+Future<void> printBillReceipt({
+  required BusinessSettings settings,
+  required String billNumberLabel,
+  required String shopName,
+  required String deliveryName,
+  required DateTime saleDate,
+  required List<BillLineItem> items,
+  required double totalAmount,
+  required BillTranslate t,
+  List<BillLineItem> returns = const [],
+  double returnsAmount = 0,
+  double previousBalance = 0,
+  double paidAmount = 0,
+  double? remainingAfter,
+  String? shopOwner,
+  String? shopAddress,
+  String? shopPhone,
+  String? notes,
+}) async {
+  final bytes = await buildBillReceiptPdf(
+    settings: settings,
+    billNumberLabel: billNumberLabel,
+    shopName: shopName,
+    deliveryName: deliveryName,
+    saleDate: saleDate,
+    items: items,
+    totalAmount: totalAmount,
+    t: t,
+    returns: returns,
+    returnsAmount: returnsAmount,
+    previousBalance: previousBalance,
+    paidAmount: paidAmount,
+    remainingAfter: remainingAfter,
+    shopOwner: shopOwner,
+    shopAddress: shopAddress,
+    shopPhone: shopPhone,
+    notes: notes,
+  );
+
+  await Printing.layoutPdf(onLayout: (format) async => bytes);
+}
+
+/// Direct Bluetooth thermal print (80mm). Pair the printer once in settings.
+Future<void> printBillReceiptThermal({
+  required String mac,
+  required BusinessSettings settings,
+  required String billNumberLabel,
+  required String shopName,
+  required String deliveryName,
+  required DateTime saleDate,
+  required List<BillLineItem> items,
+  required double totalAmount,
+  required BillTranslate t,
+  List<BillLineItem> returns = const [],
+  double returnsAmount = 0,
+  double previousBalance = 0,
+  double paidAmount = 0,
+  double? remainingAfter,
+  String? shopOwner,
+  String? shopAddress,
+  String? shopPhone,
+  String? notes,
+}) async {
+  final bytes = await buildBillReceiptPdf(
+    settings: settings,
+    billNumberLabel: billNumberLabel,
+    shopName: shopName,
+    deliveryName: deliveryName,
+    saleDate: saleDate,
+    items: items,
+    totalAmount: totalAmount,
+    t: t,
+    returns: returns,
+    returnsAmount: returnsAmount,
+    previousBalance: previousBalance,
+    paidAmount: paidAmount,
+    remainingAfter: remainingAfter,
+    shopOwner: shopOwner,
+    shopAddress: shopAddress,
+    shopPhone: shopPhone,
+    notes: notes,
+  );
+
+  await ThermalPrinterService.instance.printPdfReceipt(
+    mac: mac,
+    pdfBytes: bytes,
+  );
 }
 
 String _formatDate(DateTime date) {
