@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
-import 'package:permission_handler/permission_handler.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -63,15 +62,7 @@ class ThermalPrinterService {
   bool looksLikePrinter(String name) => _printerSortScore(name) < 2;
 
   Future<bool> requestBluetoothPermissions() async {
-    if (!Platform.isAndroid) return true;
-
-    final permissions = <Permission>[
-      Permission.bluetoothConnect,
-      Permission.bluetoothScan,
-    ];
-
-    final statuses = await permissions.request();
-    return statuses.values.every((status) => status.isGranted);
+    return PrintBluetoothThermal.isPermissionBluetoothGranted;
   }
 
   Future<SavedPrinter?> getSavedPrinter() async {
