@@ -250,6 +250,8 @@ const Map<String, String> stringsSi = {
   'printer.setupHint':
       'පළමුව දුරකථන බ්ලූටූත් සැකසුම්වල මුද්‍රකය යුගල කරන්න, පසුව මෙහි තට්ටු කරන්න.',
   'printer.saved': 'මුද්‍රකය සුරකින ලදී',
+  'printer.savedReady': 'මුද්‍රකය සුරකින ලදී. මුද්‍රණය සඳහා බිල්පත මුද්‍රණය තට්ටු කරන්න.',
+  'printer.connecting': 'මුද්‍රකයට සම්බන්ධ වෙමින්...',
   'printer.current': 'මුද්‍රකය: {name}',
   'printer.noneSaved': 'මුද්‍රකයක් තෝරා නැත',
   'printer.change': 'මුද්‍රකය වෙනස් කරන්න',

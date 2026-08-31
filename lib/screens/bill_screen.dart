@@ -212,6 +212,12 @@ class _BillScreenState extends State<BillScreen> {
         }
         if (printer == null) return;
 
+        setState(() => _savedPrinter = printer);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t('printer.connecting'))),
+        );
+
         await printBillReceiptThermal(
           mac: printer.mac,
           settings: widget.businessSettings,
@@ -232,8 +238,6 @@ class _BillScreenState extends State<BillScreen> {
           shopPhone: current.shopPhone,
           notes: current.notes,
         );
-
-        setState(() => _savedPrinter = printer);
       } else {
         await shareBillReceipt(
           saleId: current.id,
@@ -399,6 +403,9 @@ class _BillScreenState extends State<BillScreen> {
     final printer = await showPrinterSetupSheet(context);
     if (printer == null || !mounted) return;
     setState(() => _savedPrinter = printer);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(LocaleScope.of(context).t('printer.savedReady'))),
+    );
   }
 
   @override

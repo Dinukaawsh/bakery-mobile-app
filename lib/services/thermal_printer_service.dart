@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
+import 'package:permission_handler/permission_handler.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -31,9 +33,46 @@ class ThermalPrinterService {
   static const _macKey = 'thermal_printer_mac';
   static const _nameKey = 'thermal_printer_name';
   static const _paperWidthPx = 576;
+  static const _connectTimeout = Duration(seconds: 12);
 
   static bool get isSupported =>
       !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+
+  int _printerSortScore(String name) {
+    final value = name.toLowerCase();
+    if (value.contains('print') || value.contains('printer')) return 0;
+    if (value.contains('xp') ||
+        value.contains('rpp') ||
+        value.contains('mpt') ||
+        value.contains('pos')) {
+      return 1;
+    }
+    return 2;
+  }
+
+  List<BluetoothInfo> sortLikelyPrinters(List<BluetoothInfo> devices) {
+    final sorted = [...devices];
+    sorted.sort((a, b) {
+      final score = _printerSortScore(a.name).compareTo(_printerSortScore(b.name));
+      if (score != 0) return score;
+      return a.name.compareTo(b.name);
+    });
+    return sorted;
+  }
+
+  bool looksLikePrinter(String name) => _printerSortScore(name) < 2;
+
+  Future<bool> requestBluetoothPermissions() async {
+    if (!Platform.isAndroid) return true;
+
+    final permissions = <Permission>[
+      Permission.bluetoothConnect,
+      Permission.bluetoothScan,
+    ];
+
+    final statuses = await permissions.request();
+    return statuses.values.every((status) => status.isGranted);
+  }
 
   Future<SavedPrinter?> getSavedPrinter() async {
     final prefs = await SharedPreferences.getInstance();
@@ -62,8 +101,13 @@ class ThermalPrinterService {
       throw ThermalPrinterException('printer.unsupported');
     }
 
-    final granted = await PrintBluetoothThermal.isPermissionBluetoothGranted;
+    final granted = await requestBluetoothPermissions();
     if (!granted) {
+      throw ThermalPrinterException('printer.permissionDenied');
+    }
+
+    final pluginGranted = await PrintBluetoothThermal.isPermissionBluetoothGranted;
+    if (!pluginGranted) {
       throw ThermalPrinterException('printer.permissionDenied');
     }
 
@@ -79,12 +123,19 @@ class ThermalPrinterService {
     if (devices.isEmpty) {
       throw ThermalPrinterException('printer.notPaired');
     }
-    return devices;
+    return sortLikelyPrinters(devices);
   }
 
   Future<bool> connect(String mac) async {
     await ensureReady();
-    return PrintBluetoothThermal.connect(macPrinterAddress: mac);
+    try {
+      return await PrintBluetoothThermal.connect(macPrinterAddress: mac).timeout(
+        _connectTimeout,
+        onTimeout: () => false,
+      );
+    } on TimeoutException {
+      return false;
+    }
   }
 
   Future<bool> printPdfReceipt({
@@ -92,6 +143,8 @@ class ThermalPrinterService {
     required List<int> pdfBytes,
   }) async {
     await ensureReady();
+
+    await PrintBluetoothThermal.disconnect;
 
     final connected = await connect(mac);
     if (!connected) {
@@ -131,7 +184,10 @@ class ThermalPrinterService {
       ...generator.cut(),
     ];
 
-    final ok = await PrintBluetoothThermal.writeBytes(bytes);
+    final ok = await PrintBluetoothThermal.writeBytes(bytes).timeout(
+      const Duration(seconds: 30),
+      onTimeout: () => false,
+    );
     if (!ok) {
       throw ThermalPrinterException('printer.printFailed');
     }

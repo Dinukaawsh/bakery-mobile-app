@@ -247,6 +247,8 @@ const Map<String, String> stringsEn = {
   'printer.setupHint':
       'Pair the printer in your phone Bluetooth settings first, then tap it here.',
   'printer.saved': 'Printer saved',
+  'printer.savedReady': 'Printer saved. Tap Print bill to print.',
+  'printer.connecting': 'Connecting to printer...',
   'printer.current': 'Printer: {name}',
   'printer.noneSaved': 'No printer selected',
   'printer.change': 'Change printer',

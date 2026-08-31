@@ -29,7 +29,7 @@ class _PrinterSetupSheetState extends State<_PrinterSetupSheet> {
   List<BluetoothInfo> _devices = [];
   bool _loading = true;
   String? _errorCode;
-  String? _connectingMac;
+  String? _savingMac;
 
   @override
   void initState() {
@@ -65,13 +65,10 @@ class _PrinterSetupSheetState extends State<_PrinterSetupSheet> {
   }
 
   Future<void> _select(BluetoothInfo device) async {
-    final t = LocaleScope.of(context).t;
-    setState(() => _connectingMac = device.macAdress);
+    if (_savingMac != null) return;
+
+    setState(() => _savingMac = device.macAdress);
     try {
-      final connected = await _service.connect(device.macAdress);
-      if (!connected) {
-        throw ThermalPrinterException('printer.connectFailed');
-      }
       final saved = SavedPrinter(
         name: device.name,
         mac: device.macAdress,
@@ -79,22 +76,18 @@ class _PrinterSetupSheetState extends State<_PrinterSetupSheet> {
       await _service.savePrinter(saved);
       if (!mounted) return;
       Navigator.of(context).pop(saved);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(t('printer.saved'))),
-      );
-    } on ThermalPrinterException catch (error) {
+    } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(t(error.code))),
-      );
+      setState(() => _errorCode = 'printer.loadFailed');
     } finally {
-      if (mounted) setState(() => _connectingMac = null);
+      if (mounted) setState(() => _savingMac = null);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final t = LocaleScope.of(context).t;
+    final listHeight = MediaQuery.sizeOf(context).height * 0.55;
 
     return SafeArea(
       child: Padding(
@@ -138,33 +131,83 @@ class _PrinterSetupSheetState extends State<_PrinterSetupSheet> {
                 ],
               )
             else
-              Flexible(
+              SizedBox(
+                height: listHeight,
                 child: ListView.separated(
-                  shrinkWrap: true,
                   itemCount: _devices.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final device = _devices[index];
-                    final connecting = _connectingMac == device.macAdress;
-                    return ListTile(
-                      shape: RoundedRectangleBorder(
+                    final saving = _savingMac == device.macAdress;
+                    final likelyPrinter =
+                        ThermalPrinterService.instance.looksLikePrinter(
+                      device.name,
+                    );
+
+                    return Material(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
                         borderRadius: BorderRadius.circular(12),
-                        side: const BorderSide(color: Color(0xFFFDE68A)),
+                        onTap: saving ? null : () => _select(device),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: likelyPrinter
+                                  ? const Color(0xFFB45309)
+                                  : const Color(0xFFFDE68A),
+                              width: likelyPrinter ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.print_rounded,
+                                color: likelyPrinter
+                                    ? const Color(0xFFB45309)
+                                    : const Color(0xFF78716C),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      device.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      device.macAdress,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF78716C),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (saving)
+                                const BakeryLoadingSpinner(
+                                  size: BakerySpinnerSize.sm,
+                                )
+                              else
+                                const Icon(
+                                  Icons.chevron_right,
+                                  color: Color(0xFFB45309),
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
-                      tileColor: Colors.white,
-                      leading: const Icon(
-                        Icons.print_rounded,
-                        color: Color(0xFFB45309),
-                      ),
-                      title: Text(
-                        device.name,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: Text(device.macAdress),
-                      trailing: connecting
-                          ? const BakeryLoadingSpinner(size: BakerySpinnerSize.sm)
-                          : const Icon(Icons.chevron_right),
-                      onTap: connecting ? null : () => _select(device),
                     );
                   },
                 ),
