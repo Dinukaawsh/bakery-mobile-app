@@ -262,6 +262,7 @@ const Map<String, String> stringsSi = {
       'දුරකථන සැකසුම්වල Bakery යෙදුමට බ්ලූටූත් අවසරය දෙන්න.',
   'printer.connectFailed': 'මුද්‍රකයට සම්බන්ධ විය නොහැක.',
   'printer.printFailed': 'මුද්‍රණය අසාර්ථකයි. PDF බෙදාගැනීම උත්සාහ කරන්න.',
+  'printer.renderFailed': 'මුද්‍රණය සඳහා බිල්පත් රූපය සකස් කළ නොහැක.',
   'printer.loadFailed': 'යුගල කළ මුද්‍රක පූරණය කළ නොහැක.',
   'printer.unsupported':
       'මෙම උපාංගයේ සෘජු බ්ලූටූත් මුද්‍රණය ලබා ගත නොහැක.',

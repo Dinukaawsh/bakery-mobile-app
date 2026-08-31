@@ -259,6 +259,7 @@ const Map<String, String> stringsEn = {
       'Allow Bluetooth permission for Bakery in phone settings.',
   'printer.connectFailed': 'Could not connect to the printer.',
   'printer.printFailed': 'Print failed. Try Share PDF instead.',
+  'printer.renderFailed': 'Could not prepare the bill image for printing.',
   'printer.loadFailed': 'Could not load paired printers.',
   'printer.unsupported':
       'Direct Bluetooth print is not available on this device.',

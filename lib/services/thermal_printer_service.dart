@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -32,7 +33,8 @@ class ThermalPrinterService {
   static const _macKey = 'thermal_printer_mac';
   static const _nameKey = 'thermal_printer_name';
   static const _paperWidthPx = 576;
-  static const _connectTimeout = Duration(seconds: 12);
+  static const _bandHeightPx = 220;
+  static const _connectTimeout = Duration(seconds: 15);
 
   static bool get isSupported =>
       !kIsWeb && (Platform.isAndroid || Platform.isIOS);
@@ -52,7 +54,8 @@ class ThermalPrinterService {
   List<BluetoothInfo> sortLikelyPrinters(List<BluetoothInfo> devices) {
     final sorted = [...devices];
     sorted.sort((a, b) {
-      final score = _printerSortScore(a.name).compareTo(_printerSortScore(b.name));
+      final score =
+          _printerSortScore(a.name).compareTo(_printerSortScore(b.name));
       if (score != 0) return score;
       return a.name.compareTo(b.name);
     });
@@ -97,7 +100,8 @@ class ThermalPrinterService {
       throw ThermalPrinterException('printer.permissionDenied');
     }
 
-    final pluginGranted = await PrintBluetoothThermal.isPermissionBluetoothGranted;
+    final pluginGranted =
+        await PrintBluetoothThermal.isPermissionBluetoothGranted;
     if (!pluginGranted) {
       throw ThermalPrinterException('printer.permissionDenied');
     }
@@ -129,24 +133,44 @@ class ThermalPrinterService {
     }
   }
 
-  Future<bool> printPdfReceipt({
-    required String mac,
-    required List<int> pdfBytes,
-  }) async {
-    await ensureReady();
-
+  Future<void> _ensureLiveConnection(String mac) async {
     await PrintBluetoothThermal.disconnect;
+    await Future<void>.delayed(const Duration(milliseconds: 500));
 
-    final connected = await connect(mac);
+    var connected = await connect(mac);
+    if (!connected) {
+      await PrintBluetoothThermal.disconnect;
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      connected = await connect(mac);
+    }
+
     if (!connected) {
       throw ThermalPrinterException('printer.connectFailed');
     }
 
-    final raster = await Printing.raster(
-      Uint8List.fromList(pdfBytes),
-      pages: [0],
-      dpi: 203,
-    ).first;
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+
+    final live = await PrintBluetoothThermal.connectionStatus;
+    if (!live) {
+      throw ThermalPrinterException('printer.connectFailed');
+    }
+  }
+
+  Future<img.Image> _renderPdfPage(List<int> pdfBytes) async {
+    late final PdfRaster raster;
+    try {
+      raster = await Printing.raster(
+        Uint8List.fromList(pdfBytes),
+        pages: const [0],
+        dpi: 180,
+      ).first.timeout(const Duration(seconds: 25));
+    } on TimeoutException {
+      throw ThermalPrinterException('printer.renderFailed');
+    }
+
+    if (raster.width <= 0 || raster.height <= 0) {
+      throw ThermalPrinterException('printer.renderFailed');
+    }
 
     var image = img.Image.fromBytes(
       width: raster.width,
@@ -164,24 +188,92 @@ class ThermalPrinterService {
       );
     }
 
-    image = img.grayscale(image);
+    return _binarize(image);
+  }
 
+  img.Image _binarize(img.Image source) {
+    final output = img.Image(width: source.width, height: source.height);
+    for (var y = 0; y < source.height; y++) {
+      for (var x = 0; x < source.width; x++) {
+        final luma = img.getLuminance(source.getPixel(x, y));
+        output.setPixel(
+          x,
+          y,
+          luma < 165 ? img.ColorRgb8(0, 0, 0) : img.ColorRgb8(255, 255, 255),
+        );
+      }
+    }
+    return output;
+  }
+
+  List<int> _bandBytes(Generator generator, img.Image band) {
+    return [
+      ...generator.reset(),
+      ...generator.imageRaster(
+        band,
+        align: PosAlign.center,
+        highDensityHorizontal: true,
+        highDensityVertical: true,
+      ),
+      ...generator.feed(1),
+    ];
+  }
+
+  Future<bool> _writeBytes(List<int> bytes) async {
+    if (bytes.isEmpty) return true;
+
+    const chunkSize = 512;
+    for (var offset = 0; offset < bytes.length; offset += chunkSize) {
+      final end = math.min(offset + chunkSize, bytes.length);
+      final chunk = bytes.sublist(offset, end);
+      final ok = await PrintBluetoothThermal.writeBytes(chunk).timeout(
+        const Duration(seconds: 20),
+        onTimeout: () => false,
+      );
+      if (!ok) return false;
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+    }
+    return true;
+  }
+
+  Future<bool> printPdfReceipt({
+    required String mac,
+    required List<int> pdfBytes,
+  }) async {
+    await ensureReady();
+    await _ensureLiveConnection(mac);
+
+    final image = await _renderPdfPage(pdfBytes);
     final profile = await CapabilityProfile.load();
     final generator = Generator(PaperSize.mm80, profile);
-    final bytes = <int>[
-      ...generator.reset(),
-      ...generator.image(image),
-      ...generator.feed(2),
-      ...generator.cut(),
-    ];
 
-    final ok = await PrintBluetoothThermal.writeBytes(bytes).timeout(
-      const Duration(seconds: 30),
-      onTimeout: () => false,
-    );
-    if (!ok) {
+    var y = 0;
+    while (y < image.height) {
+      final height = math.min(_bandHeightPx, image.height - y);
+      final band = img.copyCrop(
+        image,
+        x: 0,
+        y: y,
+        width: image.width,
+        height: height,
+      );
+
+      final ok = await _writeBytes(_bandBytes(generator, band));
+      if (!ok) {
+        throw ThermalPrinterException('printer.printFailed');
+      }
+
+      y += height;
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+    }
+
+    final finished = await _writeBytes([
+      ...generator.feed(3),
+    ]);
+    if (!finished) {
       throw ThermalPrinterException('printer.printFailed');
     }
+
     return true;
   }
 }
