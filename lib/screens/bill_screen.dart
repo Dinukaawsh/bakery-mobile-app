@@ -214,6 +214,7 @@ class _BillScreenState extends State<BillScreen> {
 
         setState(() => _savedPrinter = printer);
 
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(t('printer.connecting'))),
         );
