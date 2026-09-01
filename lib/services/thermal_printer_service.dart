@@ -32,12 +32,14 @@ class ThermalPrinterService {
 
   static const _macKey = 'thermal_printer_mac';
   static const _nameKey = 'thermal_printer_name';
-  static const _paperWidthPx = 576;
+  static const _paperWidthPx80 = 576;
   static const _bandHeightPx = 220;
+  static const _maxReceiptHeightPx = 3200;
   static const _connectTimeout = Duration(seconds: 15);
 
   static bool get isSupported =>
-      !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+      !kIsWeb &&
+      (Platform.isAndroid || Platform.isIOS || Platform.isWindows);
 
   int _printerSortScore(String name) {
     final value = name.toLowerCase();
@@ -133,6 +135,26 @@ class ThermalPrinterService {
     }
   }
 
+  Future<void> _releaseConnection() async {
+    try {
+      await PrintBluetoothThermal.disconnect;
+    } catch (_) {
+      // Best-effort cleanup so the printer does not keep feeding.
+    }
+  }
+
+  Future<T> _withPrinterSession<T>(
+    String mac,
+    Future<T> Function() action,
+  ) async {
+    await _ensureLiveConnection(mac);
+    try {
+      return await action();
+    } finally {
+      await _releaseConnection();
+    }
+  }
+
   Future<void> _ensureLiveConnection(String mac) async {
     await PrintBluetoothThermal.disconnect;
     await Future<void>.delayed(const Duration(milliseconds: 500));
@@ -156,7 +178,81 @@ class ThermalPrinterService {
     }
   }
 
-  Future<img.Image> _renderPdfPage(List<int> pdfBytes) async {
+  Future<bool> _writeBytes(List<int> bytes) async {
+    if (bytes.isEmpty) return true;
+
+    // The plugin prepends a line-feed on every writeBytes call. Sending many
+    // small chunks causes continuous blank label feeds on gap/label paper.
+    return PrintBluetoothThermal.writeBytes(bytes).timeout(
+      const Duration(seconds: 45),
+      onTimeout: () => false,
+    );
+  }
+
+  Future<void> _finishJob(Generator generator) async {
+    final ok = await _writeBytes([
+      ...generator.feed(2),
+      ...generator.reset(),
+    ]);
+    if (!ok) {
+      throw ThermalPrinterException('printer.printFailed');
+    }
+  }
+
+  img.Image _trimBlankMargins(img.Image source) {
+    var top = 0;
+    var bottom = source.height - 1;
+
+    while (top < source.height) {
+      var rowBlank = true;
+      for (var x = 0; x < source.width; x++) {
+        if (img.getLuminance(source.getPixel(x, top)) < 165) {
+          rowBlank = false;
+          break;
+        }
+      }
+      if (!rowBlank) break;
+      top++;
+    }
+
+    while (bottom >= top) {
+      var rowBlank = true;
+      for (var x = 0; x < source.width; x++) {
+        if (img.getLuminance(source.getPixel(x, bottom)) < 165) {
+          rowBlank = false;
+          break;
+        }
+      }
+      if (!rowBlank) break;
+      bottom--;
+    }
+
+    if (bottom < top) {
+      return img.Image(width: source.width, height: 1);
+    }
+
+    return img.copyCrop(
+      source,
+      x: 0,
+      y: top,
+      width: source.width,
+      height: bottom - top + 1,
+    );
+  }
+
+  img.Image _limitHeight(img.Image source) {
+    if (source.height <= _maxReceiptHeightPx) return source;
+    return img.copyResize(
+      source,
+      height: _maxReceiptHeightPx,
+      interpolation: img.Interpolation.linear,
+    );
+  }
+
+  Future<img.Image> _renderPdfPage(
+    List<int> pdfBytes, {
+    required int targetWidthPx,
+  }) async {
     late final PdfRaster raster;
     try {
       raster = await Printing.raster(
@@ -180,15 +276,15 @@ class ThermalPrinterService {
       order: img.ChannelOrder.rgba,
     );
 
-    if (image.width != _paperWidthPx) {
+    if (image.width != targetWidthPx) {
       image = img.copyResize(
         image,
-        width: _paperWidthPx,
+        width: targetWidthPx,
         interpolation: img.Interpolation.linear,
       );
     }
 
-    return _binarize(image);
+    return _limitHeight(_trimBlankMargins(_binarize(image)));
   }
 
   img.Image _binarize(img.Image source) {
@@ -207,45 +303,22 @@ class ThermalPrinterService {
   }
 
   List<int> _bandBytes(Generator generator, img.Image band) {
-    return [
-      ...generator.reset(),
-      ...generator.imageRaster(
-        band,
-        align: PosAlign.center,
-        highDensityHorizontal: true,
-        highDensityVertical: true,
-      ),
-      ...generator.feed(1),
-    ];
+    return generator.imageRaster(
+      band,
+      align: PosAlign.center,
+      highDensityHorizontal: true,
+      highDensityVertical: true,
+    );
   }
 
-  Future<bool> _writeBytes(List<int> bytes) async {
-    if (bytes.isEmpty) return true;
-
-    const chunkSize = 512;
-    for (var offset = 0; offset < bytes.length; offset += chunkSize) {
-      final end = math.min(offset + chunkSize, bytes.length);
-      final chunk = bytes.sublist(offset, end);
-      final ok = await PrintBluetoothThermal.writeBytes(chunk).timeout(
-        const Duration(seconds: 20),
-        onTimeout: () => false,
-      );
-      if (!ok) return false;
-      await Future<void>.delayed(const Duration(milliseconds: 40));
-    }
-    return true;
-  }
-
-  Future<bool> printPdfReceipt({
-    required String mac,
-    required List<int> pdfBytes,
+  Future<bool> _printImageBands({
+    required Generator generator,
+    required img.Image image,
   }) async {
-    await ensureReady();
-    await _ensureLiveConnection(mac);
-
-    final image = await _renderPdfPage(pdfBytes);
-    final profile = await CapabilityProfile.load();
-    final generator = Generator(PaperSize.mm80, profile);
+    if (image.height <= 0) {
+      await _finishJob(generator);
+      return true;
+    }
 
     var y = 0;
     while (y < image.height) {
@@ -259,21 +332,69 @@ class ThermalPrinterService {
       );
 
       final ok = await _writeBytes(_bandBytes(generator, band));
+      if (!ok) return false;
+
+      y += height;
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+    }
+
+    await _finishJob(generator);
+    return true;
+  }
+
+  Future<bool> _printWithPaper({
+    required List<int> pdfBytes,
+    required PaperSize paperSize,
+    required int targetWidthPx,
+  }) async {
+    final image = await _renderPdfPage(
+      pdfBytes,
+      targetWidthPx: targetWidthPx,
+    );
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(paperSize, profile);
+    final resetOk = await _writeBytes(generator.reset());
+    if (!resetOk) return false;
+    return _printImageBands(generator: generator, image: image);
+  }
+
+  Future<bool> printTestPage({required String mac}) async {
+    await ensureReady();
+    return _withPrinterSession(mac, () async {
+      final profile = await CapabilityProfile.load();
+      final generator = Generator(PaperSize.mm80, profile);
+      final ok = await _writeBytes([
+        ...generator.reset(),
+        ...generator.text(
+          'Bakery printer test',
+          styles: const PosStyles(align: PosAlign.center, bold: true),
+        ),
+        ...generator.text('OK'),
+        ...generator.feed(2),
+        ...generator.reset(),
+      ]);
       if (!ok) {
         throw ThermalPrinterException('printer.printFailed');
       }
+      return true;
+    });
+  }
 
-      y += height;
-      await Future<void>.delayed(const Duration(milliseconds: 120));
-    }
-
-    final finished = await _writeBytes([
-      ...generator.feed(3),
-    ]);
-    if (!finished) {
-      throw ThermalPrinterException('printer.printFailed');
-    }
-
-    return true;
+  Future<bool> printPdfReceipt({
+    required String mac,
+    required List<int> pdfBytes,
+  }) async {
+    await ensureReady();
+    return _withPrinterSession(mac, () async {
+      final printed80 = await _printWithPaper(
+        pdfBytes: pdfBytes,
+        paperSize: PaperSize.mm80,
+        targetWidthPx: _paperWidthPx80,
+      );
+      if (!printed80) {
+        throw ThermalPrinterException('printer.printFailed');
+      }
+      return true;
+    });
   }
 }

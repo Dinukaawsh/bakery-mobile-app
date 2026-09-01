@@ -409,6 +409,34 @@ class _BillScreenState extends State<BillScreen> {
     );
   }
 
+  Future<void> _testPrint() async {
+    if (_printing) return;
+    final t = LocaleScope.of(context).t;
+    final printer = _savedPrinter ??
+        await ThermalPrinterService.instance.getSavedPrinter();
+    if (printer == null) {
+      if (!mounted) return;
+      await _changePrinter();
+      return;
+    }
+
+    setState(() => _printing = true);
+    try {
+      await ThermalPrinterService.instance.printTestPage(mac: printer.mac);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t('printer.testSent'))),
+      );
+    } on ThermalPrinterException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t(error.code))),
+      );
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final sale = _sale;
@@ -547,9 +575,28 @@ class _BillScreenState extends State<BillScreen> {
                                 color: Color(0xFF78716C),
                               ),
                             ),
-                            TextButton(
-                              onPressed: _printing ? null : _changePrinter,
-                              child: Text(t('printer.change')),
+                            const SizedBox(height: 4),
+                            Text(
+                              t('printer.disconnectHint'),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF78716C),
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                TextButton(
+                                  onPressed: _printing ? null : _changePrinter,
+                                  child: Text(t('printer.change')),
+                                ),
+                                TextButton(
+                                  onPressed:
+                                      _printing || _savedPrinter == null
+                                          ? null
+                                          : _testPrint,
+                                  child: Text(t('printer.testPrint')),
+                                ),
+                              ],
                             ),
                           ],
                         ),

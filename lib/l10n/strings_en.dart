@@ -245,11 +245,15 @@ const Map<String, String> stringsEn = {
   'printer.title': 'Bluetooth printer',
   'printer.selectPrinter': 'Select Bluetooth printer',
   'printer.setupHint':
-      'Pair the printer in your phone Bluetooth settings first, then tap it here.',
+      'Pair Printer001-A41D in phone Bluetooth settings first. Disconnect the printer from laptops/PCs before printing from the phone.',
   'printer.saved': 'Printer saved',
   'printer.savedReady': 'Printer saved. Tap Print bill to print.',
   'printer.connecting': 'Connecting to printer...',
-  'printer.current': 'Printer: {name}',
+  'printer.current': 'Saved printer: {name}',
+  'printer.disconnectHint':
+      'If print fails, turn the printer off, disconnect it from any laptop, then try again on the phone only.',
+  'printer.testPrint': 'Test print',
+  'printer.testSent': 'Test print sent.',
   'printer.noneSaved': 'No printer selected',
   'printer.change': 'Change printer',
   'printer.notPaired':
